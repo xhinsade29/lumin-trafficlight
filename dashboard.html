@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Traffic Light Control Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0a0e1a;
+  --panel:     #0f1528;
+  --border:    #1e2d4a;
+  --accent:    #00d4ff;
+  --red:       #ff3b3b;
+  --yellow:    #ffd700;
+  --green:     #00e87a;
+  --off:       #1a1a2e;
+  --text:      #c8d8f0;
+  --dim:       #4a6080;
+  --road:      #1c2030;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid var(--border);
+  background: #080c18;
+}
+
+header h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .75rem;
+  color: var(--dim);
+}
+.status-badge .dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--dim);
+  transition: background .4s;
+}
+.status-badge.connected .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 0;
+  height: calc(100vh - 57px);
+}
+
+.side-panel {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.panel-section {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-section h2 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: .65rem;
+  letter-spacing: 3px;
+  color: var(--accent);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+/* Traffic Light Widget */
+.tl-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+}
+
+.tl-housing {
+  background: #0a0c14;
+  border: 2px solid #2a3550;
+  border-radius: 18px;
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 30px #000a, inset 0 0 20px #00000055;
+  position: relative;
+}
+
+.tl-housing::before {
+  content:'';
+  position: absolute;
+  top: -10px; left: 50%; transform: translateX(-50%);
+  width: 6px; height: 12px;
+  background: #2a3550;
+  border-radius: 3px 3px 0 0;
+}
+
+.led-bulb {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: 2px solid #1a2035;
+  background: var(--off);
+  transition: background .3s, box-shadow .3s;
+  position: relative;
+}
+
+.led-bulb::after {
+  content: '';
+  position: absolute;
+  top: 20%; left: 20%;
+  width: 30%; height: 30%;
+  border-radius: 50%;
+  background: rgba(255,255,255,.15);
+}
+
+.led-bulb.active-red    { background: var(--red);    box-shadow: 0 0 20px var(--red),    0 0 60px #ff3b3b88; border-color: #ff6060; }
+.led-bulb.active-yellow { background: var(--yellow); box-shadow: 0 0 20px var(--yellow), 0 0 60px #ffd70088; border-color: #ffee55; }
+.led-bulb.active-green  { background: var(--green);  box-shadow: 0 0 20px var(--green),  0 0 60px #00e87a88; border-color: #55ffaa; }
+
+.tl-label {
+  font-size: .7rem;
+  color: var(--dim);
+  letter-spacing: 2px;
+}
+
+/* Master Power */
+.master-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.master-row span { font-size: .8rem; }
+
+.toggle-switch {
+  position: relative;
+  width: 44px; height: 24px;
+}
+.toggle-switch input { display: none; }
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #1a2035;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background .3s;
+  border: 1px solid var(--border);
+}
+.toggle-slider::before {
+  content:'';
+  position: absolute;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--dim);
+  top: 2px; left: 2px;
+  transition: transform .3s, background .3s;
+}
+.toggle-switch input:checked + .toggle-slider { background: #002a18; border-color: var(--green); }
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(20px);
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+}
+
+/* Mode Toggle */
+.mode-toggle {
+  display: flex;
+  background: #060a14;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  width: 100%;
+}
+.mode-btn {
+  flex: 1;
+  padding: .6rem;
+  text-align: center;
+  font-family: 'Orbitron', sans-serif;
+  font-size: .6rem;
+  letter-spacing: 2px;
+  cursor: pointer;
+  color: var(--dim);
+  background: transparent;
+  border: none;
+  transition: all .2s;
+}
+.mode-btn.active { background: var(--accent); color: #000; font-weight: 600; }
+
+/* Manual light buttons */
+.light-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: .5rem;
+}
+
+.light-btn {
+  padding: .7rem .3rem;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  background: #060a14;
+  cursor: pointer;
+  font-family: 'Orbitron', sans-serif;
+  font-size: .55rem;
+  letter-spacing: 1px;
+  color: var(--dim);
+  transition: all .2s;
+  text-transform: uppercase;
+}
+
+.light-btn:hover { border-color: var(--accent); color: var(--accent); }
+.light-btn.btn-red.active    { background: #2a0808; border-color: var(--red);    color: var(--red);    box-shadow: 0 0 12px #ff3b3b44; }
+.light-btn.btn-yellow.active { background: #2a2200; border-color: var(--yellow); color: var(--yellow); box-shadow: 0 0 12px #ffd70044; }
+.light-btn.btn-green.active  { background: #002218; border-color: var(--green);  color: var(--green);  box-shadow: 0 0 12px #00e87a44; }
+.light-btn.btn-off.active    { background: #0a0a14; border-color: var(--dim);    color: var(--text); }
+
+/* Timer Sliders */
+.timer-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .75rem;
+}
+.timer-row:last-child { margin-bottom: 0; }
+
+.timer-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.timer-dot.red    { background: var(--red); }
+.timer-dot.yellow { background: var(--yellow); }
+.timer-dot.green  { background: var(--green); }
+
+.timer-row label { font-size: .7rem; color: var(--dim); width: 50px; flex-shrink: 0; }
+
+input[type=range] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--accent);
+}
+
+.timer-val { font-size: .75rem; color: var(--accent); width: 32px; text-align: right; flex-shrink: 0; }
+
+/* Phase Progress Bar */
+.phase-bar-wrap { margin-top: .75rem; }
+.phase-label { display: flex; justify-content: space-between; font-size: .65rem; color: var(--dim); margin-bottom: .3rem; }
+.phase-bar-bg { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.phase-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: background .3s;
+}
+.phase-bar-fill.red    { background: var(--red); }
+.phase-bar-fill.yellow { background: var(--yellow); }
+.phase-bar-fill.green  { background: var(--green); }
+
+/* Save button */
+.save-btn {
+  width: 100%;
+  padding: .75rem;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: 3px;
+  cursor: pointer;
+  transition: all .2s;
+  text-transform: uppercase;
+}
+.save-btn:hover { background: #33ddff; box-shadow: 0 0 20px #00d4ff55; }
+.save-btn:active { transform: scale(.97); }
+.save-btn.saving { opacity: .6; cursor: wait; }
+
+/* Device info */
+.info-row { display: flex; justify-content: space-between; font-size: .7rem; padding: .25rem 0; border-bottom: 1px solid #ffffff06; }
+.info-row .key { color: var(--dim); }
+.info-row .val { color: var(--text); }
+.online-chip { display: inline-block; padding: .1rem .4rem; border-radius: 4px; font-size: .65rem; }
+.online-chip.on  { background: #00280f; color: var(--green); border: 1px solid var(--green); }
+.online-chip.off { background: #1a0808; color: var(--red);   border: 1px solid var(--red); }
+
+/* Log */
+.log-list { list-style: none; max-height: 160px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.log-list li { display: flex; align-items: center; gap: .5rem; padding: .3rem 0; border-bottom: 1px solid #ffffff08; font-size: .7rem; color: var(--dim); }
+.log-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.log-dot.red    { background: var(--red); }
+.log-dot.yellow { background: var(--yellow); }
+.log-dot.green  { background: var(--green); }
+.log-dot.off    { background: var(--dim); }
+.log-time { color: #364a66; font-size: .65rem; margin-left: auto; }
+
+/* Road Scene */
+.scene { position: relative; overflow: hidden; background: #0c1020; }
+canvas#road { display: block; width: 100%; height: 100%; }
+
+/* Config Modal */
+.modal-overlay { display: none; position: fixed; inset: 0; background: #000a; z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; width: 420px; max-width: 95vw; }
+.modal h3 { font-family: 'Orbitron', sans-serif; font-size: .8rem; letter-spacing: 3px; color: var(--accent); margin-bottom: 1.5rem; }
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-size: .7rem; color: var(--dim); margin-bottom: .4rem; }
+.form-group input { width: 100%; padding: .6rem .8rem; background: #060a14; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: .8rem; outline: none; }
+.form-group input:focus { border-color: var(--accent); }
+.modal-btns { display: flex; gap: .75rem; margin-top: 1.5rem; }
+.modal-btns button { flex: 1; padding: .7rem; border-radius: 6px; border: 1px solid var(--border); font-family: 'Orbitron', sans-serif; font-size: .6rem; letter-spacing: 2px; cursor: pointer; }
+.btn-save-cfg { background: var(--accent); color: #000; border-color: var(--accent); }
+.btn-cancel   { background: transparent; color: var(--dim); }
+
+.cfg-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--dim); padding: .3rem .6rem; cursor: pointer; font-size: .8rem; transition: all .2s; }
+.cfg-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+@media(max-width:900px){
+  .main-grid { grid-template-columns: 1fr; }
+  .scene { height: 320px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Traffic Control Center</h1>
+  <div style="display:flex;align-items:center;gap:1rem;">
+    <div class="status-badge" id="connBadge">
+      <div class="dot"></div>
+      <span id="connText">DISCONNECTED</span>
+    </div>
+    <button class="cfg-btn" onclick="openConfig()">⚙ CONFIG</button>
+  </div>
+</header>
+
+<div class="main-grid">
+  <div class="side-panel">
+
+    <!-- Traffic Light Widget -->
+    <div class="panel-section">
+      <h2>Signal Status</h2>
+      <div class="tl-widget">
+        <div class="tl-housing">
+          <div class="led-bulb" id="ledRed"></div>
+          <div class="led-bulb" id="ledYellow"></div>
+          <div class="led-bulb" id="ledGreen"></div>
+        </div>
+        <span class="tl-label" id="lightLabel">● OFF</span>
+      </div>
+      <div class="phase-bar-wrap">
+        <div class="phase-label">
+          <span id="phaseInfo">Phase</span>
+          <span id="phaseCountdown">--s</span>
+        </div>
+        <div class="phase-bar-bg"><div class="phase-bar-fill" id="phaseBar"></div></div>
+      </div>
+    </div>
+
+    <!-- Device Info -->
+    <div class="panel-section">
+      <h2>Device Info</h2>
+      <div class="info-row"><span class="key">ID</span><span class="val" id="infoId">--</span></div>
+      <div class="info-row"><span class="key">Location</span><span class="val" id="infoLoc">--</span></div>
+      <div class="info-row"><span class="key">Mode</span><span class="val" id="infoMode">--</span></div>
+      <div class="info-row"><span class="key">Status</span><span class="val"><span class="online-chip off" id="onlineChip">OFFLINE</span></span></div>
+      <div class="info-row"><span class="key">Last Seen</span><span class="val" id="infoLastSeen">--</span></div>
+    </div>
+
+    <!-- Master Switch — MANUAL power on/off -->
+    <div class="panel-section">
+      <div class="master-row">
+        <span>MASTER POWER</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="masterSwitch" onchange="onMasterChange()"/>
+          <div class="toggle-slider"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Mode -->
+    <div class="panel-section">
+      <h2>Mode</h2>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="btnAuto"   onclick="setMode('auto')">AUTO</button>
+        <button class="mode-btn"        id="btnManual" onclick="setMode('manual')">MANUAL</button>
+      </div>
+    </div>
+
+    <!-- Manual Light Control -->
+    <div class="panel-section" id="manualSection" style="display:none;">
+      <h2>Manual Light</h2>
+      <div class="light-btns">
+        <button class="light-btn btn-red"    onclick="setManualLight('red')">RED</button>
+        <button class="light-btn btn-yellow" onclick="setManualLight('yellow')">YLW</button>
+        <button class="light-btn btn-green"  onclick="setManualLight('green')">GRN</button>
+        <button class="light-btn btn-off"    onclick="setManualLight('off')">OFF</button>
+      </div>
+    </div>
+
+    <!-- Auto Timers -->
+    <div class="panel-section" id="autoSection">
+      <h2>Phase Durations (sec)</h2>
+      <div class="timer-row">
+        <div class="timer-dot red"></div>
+        <label>RED</label>
+        <input type="range" min="5" max="120" value="30" id="slRed" oninput="updSlider('red',this.value)"/>
+        <span class="timer-val" id="valRed">30</span>
+      </div>
+      <div class="timer-row">
+        <div class="timer-dot yellow"></div>
+        <label>YELLOW</label>
+        <input type="range" min="2" max="30" value="5" id="slYellow" oninput="updSlider('yellow',this.value)"/>
+        <span class="timer-val" id="valYellow">5</span>
+      </div>
+      <div class="timer-row">
+        <div class="timer-dot green"></div>
+        <label>GREEN</label>
+        <input type="range" min="5" max="120" value="25" id="slGreen" oninput="updSlider('green',this.value)"/>
+        <span class="timer-val" id="valGreen">25</span>
+      </div>
+    </div>
+
+    <!-- Save & Apply -->
+    <div class="panel-section">
+      <button class="save-btn" id="saveBtn" onclick="saveConfig()">▶ APPLY CONFIG</button>
+    </div>
+
+    <!-- Log -->
+    <div class="panel-section" style="flex:1;">
+      <h2>Event Log</h2>
+      <ul class="log-list" id="logList"></ul>
+    </div>
+
+  </div>
+
+  <!-- Road Scene -->
+  <div class="scene">
+    <canvas id="road"></canvas>
+  </div>
+</div>
+
+<!-- Config Modal -->
+<div class="modal-overlay" id="cfgModal">
+  <div class="modal">
+    <h3>☁ SUPABASE CONNECTION</h3>
+    <div class="form-group">
+      <label>Project URL</label>
+      <input type="text" id="cfgUrl" placeholder="https://xjyvtiudpgpnmwbjxaux.supabase.co"/>
+    </div>
+    <div class="form-group">
+      <label>Anon Key</label>
+      <input type="text" id="cfgKey" placeholder="sb_publishable_Vx33MOF0kKgpHCI2h9IVPQ_cj_bpIlx"/>
+    </div>
+    <div class="form-group">
+      <label>Device ID</label>
+      <input type="text" id="cfgDevice" placeholder="ESP32_TL_001" value="ESP32_TL_001"/>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel"   onclick="closeConfig()">CANCEL</button>
+      <button class="btn-save-cfg" onclick="applyConfig()">CONNECT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Supabase Config ──────────────────────────────────────
+let SUPA_URL  = localStorage.getItem('sb_url')    || '';
+let SUPA_KEY  = localStorage.getItem('sb_key')    || '';
+let DEVICE_ID = localStorage.getItem('sb_device') || 'ESP32_TL_001';
+let supabase  = null;
+let realtimeCh = null;
+
+// ── UI State ─────────────────────────────────────────────
+// enabled = MASTER POWER — must be manually turned on by the user.
+// Once on, if mode is 'auto', lights cycle automatically.
+// If mode is 'manual', user picks the light.
+let uiState = {
+  mode:          'auto',
+  enabled:       false,   // ← starts OFF; user must manually switch ON
+  manualLight:   'red',
+  redDuration:   30,
+  yellowDuration: 5,
+  greenDuration: 25,
+  currentLight:  'off'    // what the ESP32 reports / what auto cycle is on
+};
+
+// ── Auto-cycle state (dashboard-side preview when not connected) ─
+const CYCLE_ORDER = ['green', 'yellow', 'red'];
+let cycleIdx      = 0;          // index into CYCLE_ORDER
+let cycleTimer    = null;       // setInterval handle
+let phaseElapsed  = 0;          // ms elapsed in current phase
+let phaseBarRaf   = null;
+
+// ── DOM refs ─────────────────────────────────────────────
+const ledRed    = document.getElementById('ledRed');
+const ledYellow = document.getElementById('ledYellow');
+const ledGreen  = document.getElementById('ledGreen');
+
+// ═════════════════════════════════════════════════════════
+//  INIT
+// ═════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  document.getElementById('cfgUrl').value    = SUPA_URL;
+  document.getElementById('cfgKey').value    = SUPA_KEY;
+  document.getElementById('cfgDevice').value = DEVICE_ID;
+
+  // Start with everything showing OFF correctly
+  syncUI();
+
+  if (SUPA_URL && SUPA_KEY) initSupabase();
+  else openConfig();
+
+  startRoadAnimation();
+});
+
+// ═════════════════════════════════════════════════════════
+//  SUPABASE
+// ═════════════════════════════════════════════════════════
+function initSupabase() {
+  if (realtimeCh) realtimeCh.unsubscribe();
+  supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+  setConnected(false);
+  fetchDeviceState().then(() => subscribeRealtime());
+}
+
+async function fetchDeviceState() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('v_device_status')
+      .select('*')
+      .eq('device_id', DEVICE_ID)
+      .single();
+    if (error) throw error;
+    if (data) { applyRemoteState(data); setConnected(true); }
+  } catch(e) {
+    console.warn('fetchDeviceState:', e.message);
+    setConnected(false);
+  }
+}
+
+function subscribeRealtime() {
+  if (!supabase) return;
+  realtimeCh = supabase
+    .channel('device_config_changes')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'device_config', filter: `device_id=eq.${DEVICE_ID}` },
+      payload => {
+        const d = payload.new;
+        applyRemoteState({
+          mode: d.mode, enabled: d.enabled,
+          manual_light: d.manual_light,
+          current_light: d.current_light,
+          red_duration: d.red_duration,
+          yellow_duration: d.yellow_duration,
+          green_duration: d.green_duration
+        });
+      })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'devices', filter: `device_id=eq.${DEVICE_ID}` },
+      payload => updateDeviceInfo(payload.new))
+    .subscribe(status => setConnected(status === 'SUBSCRIBED'));
+}
+
+function applyRemoteState(data) {
+  uiState.mode           = data.mode            ?? uiState.mode;
+  uiState.enabled        = data.enabled         ?? uiState.enabled;
+  uiState.manualLight    = data.manual_light     ?? uiState.manualLight;
+  uiState.currentLight   = data.current_light   ?? uiState.currentLight;
+  uiState.redDuration    = data.red_duration    ?? uiState.redDuration;
+  uiState.yellowDuration = data.yellow_duration ?? uiState.yellowDuration;
+  uiState.greenDuration  = data.green_duration  ?? uiState.greenDuration;
+
+  // Sync cycle index to match current_light from ESP32
+  if (uiState.mode === 'auto' && uiState.currentLight !== 'off') {
+    const idx = CYCLE_ORDER.indexOf(uiState.currentLight);
+    if (idx !== -1) cycleIdx = idx;
+  }
+
+  syncUI();
+
+  if (data.device_id) {
+    document.getElementById('infoId').textContent  = data.device_id || '--';
+    document.getElementById('infoLoc').textContent = data.location  || '--';
+  }
+  if (data.online !== undefined) updateDeviceInfo(data);
+}
+
+function updateDeviceInfo(d) {
+  if (d.online !== undefined) {
+    const chip = document.getElementById('onlineChip');
+    chip.textContent = d.online ? 'ONLINE' : 'OFFLINE';
+    chip.className   = 'online-chip ' + (d.online ? 'on' : 'off');
+  }
+  if (d.last_seen) {
+    document.getElementById('infoLastSeen').textContent = new Date(d.last_seen).toLocaleTimeString();
+  }
+}
+
+async function saveConfig() {
+  if (!supabase) { openConfig(); return; }
+  const btn = document.getElementById('saveBtn');
+  btn.classList.add('saving');
+  btn.textContent = '⏳ SAVING…';
+
+  const patch = {
+    mode:            uiState.mode,
+    enabled:         uiState.enabled,
+    manual_light:    uiState.manualLight,
+    red_duration:    uiState.redDuration,
+    yellow_duration: uiState.yellowDuration,
+    green_duration:  uiState.greenDuration
+  };
+
+  try {
+    const { error } = await supabase
+      .from('device_config')
+      .update(patch)
+      .eq('device_id', DEVICE_ID);
+    if (error) throw error;
+
+    const lightVal = uiState.mode === 'manual' ? uiState.manualLight : uiState.currentLight;
+    await supabase.from('traffic_log').insert({
+      device_id: DEVICE_ID,
+      light: lightVal === 'off' ? 'off' : lightVal,
+      mode:  uiState.mode,
+      source:'dashboard'
+    });
+
+    addLog(lightVal, 'Config applied');
+    btn.textContent = '✓ APPLIED';
+    setTimeout(() => { btn.textContent = '▶ APPLY CONFIG'; btn.classList.remove('saving'); }, 1500);
+  } catch(e) {
+    btn.textContent = '✗ ERROR';
+    setTimeout(() => { btn.textContent = '▶ APPLY CONFIG'; btn.classList.remove('saving'); }, 2000);
+    console.error(e);
+  }
+}
+
+// ═════════════════════════════════════════════════════════
+//  UI CONTROLS  (user actions — dashboard side only)
+// ═════════════════════════════════════════════════════════
+
+// MASTER POWER — must be manually toggled by user
+function onMasterChange() {
+  uiState.enabled = document.getElementById('masterSwitch').checked;
+  if (uiState.enabled) {
+    addLog('green', 'System powered ON');
+    if (uiState.mode === 'auto') startAutoCycle();
+  } else {
+    addLog('off', 'System powered OFF');
+    stopAutoCycle();
+    uiState.currentLight = 'off';
+  }
+  syncUI();
+}
+
+function setMode(m) {
+  uiState.mode = m;
+  if (uiState.enabled) {
+    if (m === 'auto') {
+      startAutoCycle();
+    } else {
+      stopAutoCycle();
+    }
+  }
+  syncUI();
+}
+
+function setManualLight(l) {
+  uiState.manualLight = l;
+  syncUI();
+}
+
+function updSlider(color, val) {
+  val = parseInt(val);
+  if (color === 'red')    uiState.redDuration    = val;
+  if (color === 'yellow') uiState.yellowDuration = val;
+  if (color === 'green')  uiState.greenDuration  = val;
+  const key = 'val' + color.charAt(0).toUpperCase() + color.slice(1);
+  document.getElementById(key).textContent = val;
+
+  // If auto is running, the next phase change will pick up new durations.
+  // Also restart phase bar with new duration if current phase matches.
+  if (uiState.mode === 'auto' && uiState.enabled) {
+    const cur = CYCLE_ORDER[cycleIdx];
+    if (cur === color) {
+      // Restart phase bar with new duration but keep elapsed time
+      // (so the bar doesn't jump — it just recalculates remaining)
+    }
+  }
+}
+
+// ═════════════════════════════════════════════════════════
+//  AUTO CYCLE  (dashboard-local cycle for preview;
+//               ESP32 runs its own cycle independently)
+// ═════════════════════════════════════════════════════════
+let phaseStartTs = 0;
+
+function startAutoCycle() {
+  stopAutoCycle(); // clear any existing
+  cycleIdx     = 0; // always start from green
+  phaseStartTs = Date.now();
+  uiState.currentLight = CYCLE_ORDER[cycleIdx];
+  syncUI();
+  runPhase();
+}
+
+function runPhase() {
+  const light    = CYCLE_ORDER[cycleIdx];
+  const durMs    = getPhaseDuration(light) * 1000;
+  phaseStartTs   = Date.now();
+  uiState.currentLight = light;
+  syncUI();
+  addLog(light, `Auto: ${light.toUpperCase()} phase`);
+  animatePhaseBar(light, durMs);
+
+  cycleTimer = setTimeout(() => {
+    if (!uiState.enabled || uiState.mode !== 'auto') return;
+    cycleIdx = (cycleIdx + 1) % CYCLE_ORDER.length;
+    runPhase();
+  }, durMs);
+}
+
+function stopAutoCycle() {
+  if (cycleTimer) { clearTimeout(cycleTimer); cycleTimer = null; }
+  if (phaseBarRaf) { cancelAnimationFrame(phaseBarRaf); phaseBarRaf = null; }
+  document.getElementById('phaseBar').style.width = '0%';
+  document.getElementById('phaseCountdown').textContent = '--s';
+}
+
+function getPhaseDuration(light) {
+  if (light === 'red')    return uiState.redDuration;
+  if (light === 'yellow') return uiState.yellowDuration;
+  if (light === 'green')  return uiState.greenDuration;
+  return 30;
+}
+
+function animatePhaseBar(light, durMs) {
+  if (phaseBarRaf) cancelAnimationFrame(phaseBarRaf);
+  const bar = document.getElementById('phaseBar');
+  bar.className = 'phase-bar-fill ' + light;
+  document.getElementById('phaseInfo').textContent = (light + ' phase').toUpperCase();
+
+  const start = Date.now();
+  function tick() {
+    const elapsed = Date.now() - start;
+    const pct     = Math.min(100, (elapsed / durMs) * 100);
+    bar.style.width = pct + '%';
+    const rem = Math.max(0, Math.ceil((durMs - elapsed) / 1000));
+    document.getElementById('phaseCountdown').textContent = rem + 's';
+    if (pct < 100 && uiState.enabled && uiState.mode === 'auto') {
+      phaseBarRaf = requestAnimationFrame(tick);
+    }
+  }
+  tick();
+}
+
+// ═════════════════════════════════════════════════════════
+//  SYNC UI
+// ═════════════════════════════════════════════════════════
+function syncUI() {
+  // Master switch
+  document.getElementById('masterSwitch').checked = uiState.enabled;
+
+  // Mode buttons
+  document.getElementById('btnAuto').classList.toggle('active',   uiState.mode === 'auto');
+  document.getElementById('btnManual').classList.toggle('active', uiState.mode === 'manual');
+
+  // Panels
+  document.getElementById('manualSection').style.display = uiState.mode === 'manual' ? 'block' : 'none';
+  document.getElementById('autoSection').style.display   = uiState.mode === 'auto'   ? 'block' : 'none';
+
+  // Manual light button highlight
+  ['red','yellow','green','off'].forEach(l => {
+    const b = document.querySelector('.btn-' + l);
+    if (b) b.classList.toggle('active', uiState.manualLight === l && uiState.mode === 'manual');
+  });
+
+  // Determine displayed light
+  let displayLight;
+  if (!uiState.enabled) {
+    displayLight = 'off';
+  } else if (uiState.mode === 'manual') {
+    displayLight = uiState.manualLight;
+  } else {
+    displayLight = uiState.currentLight || 'off';
+  }
+
+  setLightDisplay(displayLight);
+
+  // Sliders
+  document.getElementById('slRed').value    = uiState.redDuration;
+  document.getElementById('slYellow').value = uiState.yellowDuration;
+  document.getElementById('slGreen').value  = uiState.greenDuration;
+  document.getElementById('valRed').textContent    = uiState.redDuration;
+  document.getElementById('valYellow').textContent = uiState.yellowDuration;
+  document.getElementById('valGreen').textContent  = uiState.greenDuration;
+
+  document.getElementById('infoMode').textContent = uiState.mode.toUpperCase();
+
+  // If system is off, clear phase bar
+  if (!uiState.enabled) {
+    document.getElementById('phaseBar').style.width = '0%';
+    document.getElementById('phaseCountdown').textContent = '--s';
+    document.getElementById('phaseInfo').textContent = 'Phase';
+  }
+}
+
+function setLightDisplay(light) {
+  ledRed.className    = 'led-bulb' + (light === 'red'    ? ' active-red'    : '');
+  ledYellow.className = 'led-bulb' + (light === 'yellow' ? ' active-yellow' : '');
+  ledGreen.className  = 'led-bulb' + (light === 'green'  ? ' active-green'  : '');
+
+  const labels = { red:'● RED', yellow:'● YELLOW', green:'● GREEN', off:'● OFF' };
+  const colors  = { red:'var(--red)', yellow:'var(--yellow)', green:'var(--green)', off:'var(--dim)' };
+  const lbl = document.getElementById('lightLabel');
+  lbl.textContent = labels[light] || '● OFF';
+  lbl.style.color  = colors[light] || 'var(--dim)';
+}
+
+// ═════════════════════════════════════════════════════════
+//  LOG
+// ═════════════════════════════════════════════════════════
+function addLog(light, msg) {
+  const list = document.getElementById('logList');
+  const li   = document.createElement('li');
+  const time = new Date().toLocaleTimeString();
+  li.innerHTML = `<span class="log-dot ${light}"></span><span>${msg}</span><span class="log-time">${time}</span>`;
+  list.insertBefore(li, list.firstChild);
+  while (list.children.length > 30) list.removeChild(list.lastChild);
+}
+
+// ═════════════════════════════════════════════════════════
+//  CONNECTION STATUS
+// ═════════════════════════════════════════════════════════
+function setConnected(ok) {
+  const badge = document.getElementById('connBadge');
+  badge.classList.toggle('connected', ok);
+  document.getElementById('connText').textContent = ok ? 'CONNECTED' : 'DISCONNECTED';
+  if (ok) addLog('green', 'Supabase connected');
+}
+
+// ═════════════════════════════════════════════════════════
+//  CONFIG MODAL
+// ═════════════════════════════════════════════════════════
+function openConfig()  { document.getElementById('cfgModal').classList.add('open'); }
+function closeConfig() { document.getElementById('cfgModal').classList.remove('open'); }
+
+function applyConfig() {
+  SUPA_URL  = document.getElementById('cfgUrl').value.trim();
+  SUPA_KEY  = document.getElementById('cfgKey').value.trim();
+  DEVICE_ID = document.getElementById('cfgDevice').value.trim() || 'ESP32_TL_001';
+  localStorage.setItem('sb_url',    SUPA_URL);
+  localStorage.setItem('sb_key',    SUPA_KEY);
+  localStorage.setItem('sb_device', DEVICE_ID);
+  closeConfig();
+  initSupabase();
+}
+
+// ═════════════════════════════════════════════════════════
+//  ROAD ANIMATION
+// ═════════════════════════════════════════════════════════
+const canvas = document.getElementById('road');
+const ctx    = canvas.getContext('2d');
+
+// ── Road geometry constants (set in resize, used everywhere) ──
+let W = 0, H = 0, HY = 0, VX = 0;
+const ROAD_W = 64;
+
+// ── Cars ──────────────────────────────────────────────────
+const CAR_COLORS = ['#3a7bd5','#e84393','#ff6b35','#00c9ff','#c0392b',
+                    '#27ae60','#8e44ad','#f39c12','#16a085','#2980b9'];
+
+const cars = [];
+
+/**
+ * dir: 'right' | 'left' | 'down' | 'up'
+ * Each car stays in its own lane (fixed Y for horizontal, fixed X for vertical).
+ */
+function makeCar(dir) {
+  const color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
+  const speed = 0.6 + Math.random() * 1.1;
+  let x, y, laneOffset;
+
+  // Lanes are offset from road center
+  // Horizontal road at HY: right-going cars in top half, left-going in bottom half
+  // Vertical road at VX:   down-going cars in left half, up-going in right half
+  switch (dir) {
+    case 'right':
+      laneOffset = -16;
+      x = Math.random() * W;
+      y = HY + laneOffset;
+      break;
+    case 'left':
+      laneOffset = 16;
+      x = Math.random() * W;
+      y = HY + laneOffset;
+      break;
+    case 'down':
+      laneOffset = -16;
+      x = VX + laneOffset;
+      y = Math.random() * H;
+      break;
+    case 'up':
+      laneOffset = 16;
+      x = VX + laneOffset;
+      y = Math.random() * H;
+      break;
+  }
+
+  return { x, y, dir, speed, color, w: 22, h: 12, laneOffset, stopped: false };
+}
+
+function initCars() {
+  cars.length = 0;
+  // 4 directions × ~3 cars each
+  ['right','left','down','up'].forEach(dir => {
+    for (let i = 0; i < 3; i++) cars.push(makeCar(dir));
+  });
+}
+
+// ── Stop logic ───────────────────────────────────────────
+/**
+ * A car approaching the intersection stops when:
+ *  - The light is red OR yellow
+ *  - It hasn't crossed the stop line yet
+ *
+ * Stop line positions:
+ *  - rightward cars: stop at x = VX - ROAD_W/2 - 5
+ *  - leftward cars:  stop at x = VX + ROAD_W/2 + 5
+ *  - downward cars:  stop at y = HY - ROAD_W/2 - 5
+ *  - upward cars:    stop at y = HY + ROAD_W/2 + 5
+ */
+function shouldCarStop(car) {
+  const light = getDisplayLight();
+  if (light !== 'red' && light !== 'yellow') return false;
+
+  const STOP_MARGIN = 8; // px before stop line
+
+  switch (car.dir) {
+    case 'right': {
+      const stopX = VX - ROAD_W / 2 - STOP_MARGIN;
+      // approaching = x is before stop line (from left)
+      return car.x < stopX && car.x > stopX - 200;
+    }
+    case 'left': {
+      const stopX = VX + ROAD_W / 2 + STOP_MARGIN;
+      return car.x > stopX && car.x < stopX + 200;
+    }
+    case 'down': {
+      const stopY = HY - ROAD_W / 2 - STOP_MARGIN;
+      return car.y < stopY && car.y > stopY - 200;
+    }
+    case 'up': {
+      const stopY = HY + ROAD_W / 2 + STOP_MARGIN;
+      return car.y > stopY && car.y < stopY + 200;
+    }
+  }
+  return false;
+}
+
+function getDisplayLight() {
+  if (!uiState.enabled) return 'off';
+  if (uiState.mode === 'manual') return uiState.manualLight;
+  return uiState.currentLight || 'off';
+}
+
+// ── Main animation loop ──────────────────────────────────
+function startRoadAnimation() {
+  function resize() {
+    const scene = canvas.parentElement;
+    W = canvas.width  = scene.clientWidth;
+    H = canvas.height = scene.clientHeight;
+    HY = H * 0.55;
+    VX = W * 0.45;
+    initCars();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Sky
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#080d1a');
+    sky.addColorStop(1, '#0c1428');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    // Stars
+    ctx.fillStyle = '#ffffff18';
+    for (let s = 0; s < 60; s++) {
+      ctx.fillRect((s * 137.5) % W, (s * 79.3) % (H * 0.6), 1, 1);
+    }
+
+    // ── Roads ──
+    ctx.fillStyle = '#1c2030';
+    ctx.fillRect(0, HY - ROAD_W / 2, W, ROAD_W);         // horizontal
+    ctx.fillRect(VX - ROAD_W / 2, 0, ROAD_W, H);         // vertical
+    ctx.fillStyle = '#1a1d2c';
+    ctx.fillRect(VX - ROAD_W / 2, HY - ROAD_W / 2, ROAD_W, ROAD_W); // intersection
+
+    // Kerb lines
+    ctx.strokeStyle = '#ffffff12';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(0, HY - ROAD_W / 2, W, ROAD_W);
+    ctx.strokeRect(VX - ROAD_W / 2, 0, ROAD_W, H);
+
+    // Center dashes
+    ctx.setLineDash([18, 14]);
+    ctx.strokeStyle = '#ffffff22';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, HY);                      ctx.lineTo(VX - ROAD_W / 2, HY);
+    ctx.moveTo(VX + ROAD_W / 2, HY);       ctx.lineTo(W, HY);
+    ctx.moveTo(VX, 0);                      ctx.lineTo(VX, HY - ROAD_W / 2);
+    ctx.moveTo(VX, HY + ROAD_W / 2);       ctx.lineTo(VX, H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Zebra crossings
+    for (let z = 0; z < 5; z++) {
+      ctx.fillStyle = '#ffffff09';
+      ctx.fillRect(VX + ROAD_W / 2 + 8 + z * 10, HY - ROAD_W / 2, 6, ROAD_W);
+      ctx.fillRect(VX - ROAD_W / 2, HY + ROAD_W / 2 + 8 + z * 10, ROAD_W, 6);
+    }
+
+    // Buildings
+    drawBuildings();
+
+    // ── Traffic light pole ──
+    const tlx = VX + ROAD_W / 2 + 10;
+    const tly = HY - ROAD_W / 2 - 64;
+    const light = getDisplayLight();
+
+    ctx.strokeStyle = '#3a4a66';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(tlx, HY - ROAD_W / 2);
+    ctx.lineTo(tlx, tly + 10);
+    ctx.stroke();
+
+    // Housing
+    ctx.fillStyle = '#0a0c14';
+    ctx.strokeStyle = '#2a3550';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, tlx - 9, tly, 18, 48, 4);
+    ctx.fill(); ctx.stroke();
+
+    const lGlow = { red: '#ff3b3b', yellow: '#ffd700', green: '#00e87a' };
+    ['red', 'yellow', 'green'].forEach((l, i) => {
+      const cy = tly + 8 + i * 14;
+      const isOn = l === light;
+      ctx.beginPath();
+      ctx.arc(tlx, cy, 5, 0, Math.PI * 2);
+      if (isOn) {
+        ctx.shadowColor = lGlow[l];
+        ctx.shadowBlur  = 14;
+      }
+      ctx.fillStyle = isOn ? lGlow[l] : '#1a2035';
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    });
+
+    // Glow halo on road when light is on
+    if (light !== 'off') {
+      const grd = ctx.createRadialGradient(tlx, tly + 24, 0, tlx, tly + 24, 60);
+      grd.addColorStop(0, lGlow[light] + '33');
+      grd.addColorStop(1, 'transparent');
+      ctx.fillStyle = grd;
+      ctx.fillRect(tlx - 65, tly - 10, 130, 90);
+    }
+
+    // ── Cars ──
+    cars.forEach(car => {
+      car.stopped = shouldCarStop(car);
+
+      if (!car.stopped) {
+        switch (car.dir) {
+          case 'right': car.x += car.speed; if (car.x > W + 30) car.x = -30; break;
+          case 'left':  car.x -= car.speed; if (car.x < -30)    car.x = W + 30; break;
+          case 'down':  car.y += car.speed; if (car.y > H + 30) car.y = -30; break;
+          case 'up':    car.y -= car.speed; if (car.y < -30)    car.y = H + 30; break;
+        }
+      }
+
+      // Keep car on its lane (clamp Y for horizontal, X for vertical)
+      if (car.dir === 'right' || car.dir === 'left') {
+        car.y = HY + car.laneOffset;
+      } else {
+        car.x = VX + car.laneOffset;
+      }
+
+      drawCar(car);
+    });
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function drawCar(car) {
+  ctx.save();
+  ctx.translate(car.x, car.y);
+
+  let angle = 0;
+  if (car.dir === 'left')  angle = Math.PI;
+  if (car.dir === 'down')  angle = Math.PI / 2;
+  if (car.dir === 'up')    angle = -Math.PI / 2;
+  ctx.rotate(angle);
+
+  const cw = car.w, ch = car.h;
+
+  // Body
+  ctx.fillStyle = car.color;
+  roundRect(ctx, -cw / 2, -ch / 2, cw, ch, 3);
+  ctx.fill();
+
+  // Roof
+  ctx.fillStyle = car.color + 'bb';
+  roundRect(ctx, -cw / 2 + 4, -ch / 2 + 2, cw - 14, ch - 4, 2);
+  ctx.fill();
+
+  // Windshield (front = +x direction)
+  ctx.fillStyle = '#8ac4ff55';
+  ctx.fillRect(cw / 2 - 8, -ch / 2 + 2, 5, ch - 4);
+
+  // Headlights
+  ctx.fillStyle = '#ffffaacc';
+  ctx.fillRect(cw / 2 - 2, -ch / 2 + 2, 2, 3);
+  ctx.fillRect(cw / 2 - 2, ch / 2 - 5,  2, 3);
+
+  // Taillights
+  ctx.fillStyle = '#ff444488';
+  ctx.fillRect(-cw / 2, -ch / 2 + 2, 2, 3);
+  ctx.fillRect(-cw / 2, ch / 2 - 5,  2, 3);
+
+  // Brake lights when stopped
+  if (car.stopped) {
+    ctx.fillStyle = '#ff4444dd';
+    ctx.fillRect(-cw / 2, -ch / 2 + 2, 3, 4);
+    ctx.fillRect(-cw / 2, ch / 2 - 6,  3, 4);
+  }
+
+  ctx.restore();
+}
+
+function drawBuildings() {
+  const bldgs = [
+    { x:.05, w:.08, h:.25, c:'#111828' },
+    { x:.15, w:.06, h:.18, c:'#0e1a2e' },
+    { x:.65, w:.09, h:.22, c:'#111828' },
+    { x:.76, w:.07, h:.15, c:'#0d1624' },
+    { x:.86, w:.08, h:.28, c:'#0f1a30' },
+    { x:.93, w:.05, h:.12, c:'#0e1826' },
+  ];
+  bldgs.forEach(b => {
+    const bx = b.x * W, bw = b.w * W;
+    const bh = b.h * (HY - 20);
+    const by = HY - 32 - bh;
+    ctx.fillStyle = b.c;
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = '#ffd70022';
+    for (let wr = 0; wr < Math.floor(bh / 14); wr++) {
+      for (let wc = 0; wc < Math.floor(bw / 10); wc++) {
+        if (Math.random() < .35) ctx.fillRect(bx + 3 + wc * 9, by + 4 + wr * 12, 5, 7);
+      }
+    }
+  });
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+</script>
+</body>
+</html>
