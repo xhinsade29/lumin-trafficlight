@@ -3,1222 +3,1577 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Traffic Light Control Center</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<title>LUMIN — Traffic Light Controller</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#2d1b4e;--surf:#3d2358;--card:#4a2d6e;--card2:#5d3a7f;
+  --border:#7c5295;--border2:#9b7cb6;--text:#fff5f7;--muted:#c4a4d4;--subtle:#9b7cb6;
+  --red:#ff6b9d;--red-bg:#4a1a3c;--red-glow:rgba(255,107,157,0.35);
+  --yellow:#ffd93d;--yel-bg:#4a3a1a;--yel-glow:rgba(255,217,61,0.35);
+  --green:#6bcb77;--grn-bg:#1a3c2e;--grn-glow:rgba(107,203,119,0.35);
+  --blue:#7dd3fc;--blu-bg:#1a2a4a;--purple:#e9a1ff;
+  --mono:'JetBrains Mono',monospace;--sans:'Syne',sans-serif;--r:12px;--r2:8px;
+}
+body{background:linear-gradient(135deg,#2d1b4e 0%,#3d2358 50%,#4a1a4e 100%);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,.03) 2px,rgba(255,255,255,.03) 4px);pointer-events:none;z-index:999}
+header{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.5rem;background:rgba(74,45,110,.85);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;backdrop-filter:blur(12px)}
+.brand{display:flex;align-items:center;gap:.75rem;font-family:var(--mono);font-weight:800;font-size:.85rem;letter-spacing:.15em;color:var(--text)}
+.brand-icon{display:flex;gap:3px;align-items:center}
+.brand-dot{width:8px;height:8px;border-radius:50%;animation:breathe 2s ease-in-out infinite}
+.brand-dot:nth-child(1){background:var(--red);animation-delay:0s}
+.brand-dot:nth-child(2){background:var(--yellow);animation-delay:.4s}
+.brand-dot:nth-child(3){background:var(--green);animation-delay:.8s}
+@keyframes breathe{0%,100%{opacity:.35;transform:scale(.78)}50%{opacity:1;transform:scale(1)}}
+.hd-right{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.pill{display:flex;align-items:center;gap:.4rem;padding:.28rem .7rem;border-radius:100px;border:1px solid var(--border2);background:var(--card);font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.1em;color:var(--muted);transition:all .25s;white-space:nowrap}
+.pill .dot{width:5px;height:5px;border-radius:50%;background:var(--muted);transition:all .25s;flex-shrink:0}
+.pill.ok{color:var(--green);border-color:rgba(0,240,128,.25);background:var(--grn-bg)}.pill.ok .dot{background:var(--green);box-shadow:0 0 6px var(--green)}
+.pill.err{color:var(--red);border-color:rgba(255,64,64,.25);background:var(--red-bg)}.pill.err .dot{background:var(--red)}
+.pill.loading{color:var(--blue);border-color:rgba(61,139,255,.25);background:var(--blu-bg)}.pill.loading .dot{background:var(--blue);animation:breathe 1s ease-in-out infinite}
+.serial-pill{cursor:pointer}.serial-pill:hover{border-color:var(--purple);color:var(--purple)}
+.serial-pill.connected{color:var(--purple);border-color:rgba(157,122,255,.25);background:#0e0a1e}.serial-pill.connected .dot{background:var(--purple);box-shadow:0 0 6px var(--purple)}
+.hd-btn{padding:.28rem .75rem;border-radius:100px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.1em;cursor:pointer;transition:all .2s;white-space:nowrap}
+.hd-btn:hover{border-color:var(--blue);color:var(--blue)}
+.page{display:grid;grid-template-columns:280px 1fr 260px;gap:1rem;padding:1rem 1.25rem;flex:1;max-width:1800px;width:100%;margin:0 auto}
+.col{display:flex;flex-direction:column;gap:.85rem}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem}
+.card-label{font-family:var(--mono);font-size:.55rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.85rem;display:flex;align-items:center;gap:.5rem}
+.card-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.power-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.power-label{font-family:var(--sans);font-weight:700;font-size:.95rem}
+.power-sub{font-family:var(--mono);font-size:.6rem;color:var(--muted);margin-top:.25rem;transition:color .3s}
+.power-sub.on{color:var(--green)}
+.tog{position:relative;width:48px;height:26px;cursor:pointer;flex-shrink:0}
+.tog input{display:none}
+.tog-track{position:absolute;inset:0;background:var(--border2);border-radius:13px;border:1px solid var(--border2);transition:background .25s,border-color .25s}
+.tog-thumb{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:transform .25s,background .25s,box-shadow .25s}
+.tog input:checked~.tog-track{background:var(--grn-bg);border-color:rgba(0,240,128,.5)}
+.tog input:checked~.tog-thumb{transform:translateX(22px);background:var(--green);box-shadow:0 0 10px var(--green)}
+.signal-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem;display:flex;flex-direction:column;align-items:center;gap:.9rem}
+.tl-housing{background:#07090f;border:2px solid var(--border2);border-radius:18px;padding:12px 16px;display:flex;flex-direction:column;gap:9px;position:relative;box-shadow:inset 0 2px 10px rgba(0,0,0,.5)}
+.tl-housing::before{content:'';position:absolute;top:-11px;left:50%;transform:translateX(-50%);width:5px;height:12px;background:var(--border2);border-radius:3px 3px 0 0}
+.tl-post{position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);width:34px;height:8px;background:var(--border2);border-radius:0 0 6px 6px}
+.bulb{width:54px;height:54px;border-radius:50%;background:#070911;border:2px solid #181d2e;position:relative;overflow:hidden;transition:background .2s,border-color .2s,box-shadow .2s}
+.bulb::after{content:'';position:absolute;top:14%;left:14%;width:32%;height:32%;border-radius:50%;background:rgba(255,255,255,.08)}
+.bulb.on-red{background:var(--red);border-color:rgba(255,120,120,.6);box-shadow:0 0 22px var(--red),0 0 60px var(--red-glow)}
+.bulb.on-yellow{background:var(--yellow);border-color:rgba(255,230,100,.6);box-shadow:0 0 22px var(--yellow),0 0 60px var(--yel-glow)}
+.bulb.on-green{background:var(--green);border-color:rgba(100,255,180,.6);box-shadow:0 0 22px var(--green),0 0 60px var(--grn-glow)}
+.signal-label{font-family:var(--mono);font-weight:800;font-size:1.1rem;letter-spacing:.2em;color:var(--muted);transition:color .2s,text-shadow .2s}
+.signal-label.red{color:var(--red);text-shadow:0 0 20px var(--red)}
+.signal-label.yellow{color:var(--yellow);text-shadow:0 0 20px var(--yellow)}
+.signal-label.green{color:var(--green);text-shadow:0 0 20px var(--green)}
+.ring-wrap{display:flex;flex-direction:column;align-items:center}
+.ring-svg{transform:rotate(-90deg)}
+.ring-track{fill:none;stroke:var(--border2);stroke-width:4.5}
+.ring-fill{fill:none;stroke-width:4.5;stroke-linecap:round}
+.ring-text{font-family:var(--mono);font-weight:800;font-size:1.5rem;fill:var(--text);text-anchor:middle;dominant-baseline:central}
+.ring-unit{font-family:var(--mono);font-size:.5rem;fill:var(--muted);text-anchor:middle}
+.info-tbl{border-radius:var(--r2);overflow:hidden;border:1px solid var(--border)}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:.45rem .8rem;border-bottom:1px solid var(--border);font-size:.68rem}
+.info-row:last-child{border-bottom:none}
+.info-k{color:var(--muted);font-family:var(--mono);font-size:.6rem}
+.info-v{font-family:var(--mono);font-weight:700;color:var(--text);font-size:.68rem}
+.badge{display:inline-flex;align-items:center;gap:.3rem;padding:.12rem .45rem;border-radius:100px;font-family:var(--mono);font-size:.58rem;font-weight:700}
+.b-on{background:var(--grn-bg);color:var(--green);border:1px solid rgba(0,240,128,.2)}
+.b-off{background:var(--red-bg);color:var(--red);border:1px solid rgba(255,64,64,.2)}
+.b-auto{background:var(--blu-bg);color:var(--blue);border:1px solid rgba(61,139,255,.2)}
+.b-serial{background:#0e0a1e;color:var(--purple);border:1px solid rgba(157,122,255,.2)}
+.scene-wrap{position:relative;background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;flex:1;min-height:440px}
+#roadCanvas{width:100%;height:100%;display:block}
+.phase-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:.85rem 1.1rem}
+.phase-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:.55rem}
+.phase-name{font-family:var(--mono);font-weight:700;font-size:.75rem;transition:color .3s}
+.phase-rem{font-family:var(--mono);font-size:.62rem;color:var(--muted)}
+.bar-bg{height:5px;background:var(--border2);border-radius:5px;overflow:hidden}
+.bar-fill{height:100%;border-radius:5px;position:relative;overflow:hidden;transition:background .3s}
+.bar-fill::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);animation:shimmer 1.8s ease-in-out infinite}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.log-list{list-style:none;display:flex;flex-direction:column;max-height:200px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.log-item{display:flex;align-items:flex-start;gap:.5rem;padding:.38rem 0;border-bottom:1px solid rgba(255,255,255,.03);font-size:.63rem;animation:fade-in .25s ease}
+.log-item:last-child{border-bottom:none}
+@keyframes fade-in{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.log-pip{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.log-pip.red{background:var(--red)}.log-pip.yellow{background:var(--yellow)}.log-pip.green{background:var(--green)}
+.log-pip.off{background:var(--subtle)}.log-pip.info{background:var(--blue)}.log-pip.serial{background:var(--purple)}.log-pip.warn{background:var(--yellow)}
+.log-msg{flex:1;color:var(--muted);line-height:1.4;word-break:break-word}
+.log-ts{color:var(--subtle);font-size:.55rem;white-space:nowrap;flex-shrink:0;font-family:var(--mono)}
+.act-list{display:flex;flex-direction:column;gap:.4rem;max-height:220px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.act-item{display:flex;align-items:center;gap:.5rem;padding:.4rem .65rem;background:var(--surf);border:1px solid var(--border);border-radius:var(--r2);font-size:.64rem;animation:fade-in .25s ease}
+.act-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.act-dot.red{background:var(--red)}.act-dot.yellow{background:var(--yellow)}.act-dot.green{background:var(--green)}.act-dot.off{background:var(--subtle)}
+.act-info{flex:1}.act-name{font-weight:700;color:var(--text);font-family:var(--mono)}.act-src{color:var(--muted);font-size:.58rem;font-family:var(--mono)}
+.act-time{color:var(--subtle);font-size:.57rem;white-space:nowrap;font-family:var(--mono)}
+.err-banner{display:none;padding:.5rem .85rem;background:var(--red-bg);border:1px solid rgba(255,64,64,.3);border-radius:var(--r2);font-family:var(--mono);font-size:.65rem;color:var(--red)}
+.err-banner.show{display:block}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(8px);z-index:200;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:1.5rem;width:380px;max-width:95vw}
+.modal h2{font-family:var(--mono);font-weight:800;font-size:.85rem;letter-spacing:.12em;margin-bottom:1.1rem;color:var(--text)}
+.field{margin-bottom:.8rem}
+.field label{display:block;font-family:var(--mono);font-size:.58rem;color:var(--muted);margin-bottom:.3rem;letter-spacing:.1em}
+.field select{width:100%;padding:.55rem .75rem;background:var(--surf);border:1px solid var(--border2);border-radius:var(--r2);color:var(--text);font-family:var(--mono);font-size:.72rem;outline:none;transition:border-color .2s}
+.field select:focus{border-color:var(--blue)}
+.modal-btns{display:flex;gap:.55rem;margin-top:1.1rem}
+.modal-btns button{flex:1;padding:.6rem;border-radius:var(--r2);font-family:var(--mono);font-weight:700;font-size:.65rem;letter-spacing:.1em;cursor:pointer;transition:all .2s}
+.btn-ok{background:var(--blue);color:#fff;border:none}.btn-ok:hover{background:#5fa0ff}
+.btn-cancel{background:transparent;color:var(--muted);border:1px solid var(--border2)}.btn-cancel:hover{color:var(--text);border-color:var(--text)}
+.btn-disc{background:transparent;color:var(--red);border:1px solid rgba(255,64,64,.3)}.btn-disc:hover{background:var(--red-bg)}
+.modal-err{display:none;padding:.45rem .75rem;background:var(--red-bg);border:1px solid rgba(255,64,64,.3);border-radius:6px;font-family:var(--mono);font-size:.62rem;color:var(--red);margin-bottom:.7rem}
+.modal-err.show{display:block}
+.smon{background:var(--surf);border:1px solid var(--border);border-radius:var(--r2);padding:.65rem;font-family:var(--mono);font-size:.6rem;color:var(--muted);height:120px;overflow-y:auto;line-height:1.7;white-space:pre-wrap;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
-:root {
-  --bg:        #0a0e1a;
-  --panel:     #0f1528;
-  --border:    #1e2d4a;
-  --accent:    #00d4ff;
-  --red:       #ff3b3b;
-  --yellow:    #ffd700;
-  --green:     #00e87a;
-  --off:       #1a1a2e;
-  --text:      #c8d8f0;
-  --dim:       #4a6080;
-  --road:      #1c2030;
+/* Interactive & Creative Enhancements */
+@keyframes gradientShift {
+  0%,100%{background-position:0% 50%}
+  50%{background-position:100% 50%}
 }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Share Tech Mono', monospace;
-  min-height: 100vh;
-  overflow-x: hidden;
+body{
+  background:linear-gradient(-45deg,#2d1b4e,#3d2358,#4a1a4e,#5d3a7f);
+  background-size:400% 400%;
+  animation:gradientShift 15s ease infinite;
 }
 
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 2rem;
-  border-bottom: 1px solid var(--border);
-  background: #080c18;
+.card,.power-card,.signal-card,.phase-card{
+  transition:all .3s ease;
+  position:relative;
+  overflow:hidden;
 }
 
-header h1 {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 1.1rem;
-  font-weight: 900;
-  letter-spacing: 3px;
-  color: var(--accent);
-  text-transform: uppercase;
-}
-
-.status-badge {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  font-size: .75rem;
-  color: var(--dim);
-}
-.status-badge .dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: var(--dim);
-  transition: background .4s;
-}
-.status-badge.connected .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
-
-.main-grid {
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  gap: 0;
-  height: calc(100vh - 57px);
-}
-
-.side-panel {
-  background: var(--panel);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-}
-
-.panel-section {
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.panel-section h2 {
-  font-family: 'Orbitron', sans-serif;
-  font-size: .65rem;
-  letter-spacing: 3px;
-  color: var(--accent);
-  margin-bottom: 1rem;
-  text-transform: uppercase;
-}
-
-/* Traffic Light Widget */
-.tl-widget {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: .5rem;
-}
-
-.tl-housing {
-  background: #0a0c14;
-  border: 2px solid #2a3550;
-  border-radius: 18px;
-  padding: 14px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 4px 30px #000a, inset 0 0 20px #00000055;
-  position: relative;
-}
-
-.tl-housing::before {
+.card::before,.power-card::before,.signal-card::before,.phase-card::before{
   content:'';
-  position: absolute;
-  top: -10px; left: 50%; transform: translateX(-50%);
-  width: 6px; height: 12px;
-  background: #2a3550;
-  border-radius: 3px 3px 0 0;
+  position:absolute;
+  top:-50%;
+  left:-50%;
+  width:200%;
+  height:200%;
+  background:radial-gradient(circle,rgba(255,255,255,0.1) 0%,transparent 60%);
+  opacity:0;
+  transition:opacity .3s ease;
+  pointer-events:none;
 }
 
-.led-bulb {
-  width: 56px; height: 56px;
-  border-radius: 50%;
-  border: 2px solid #1a2035;
-  background: var(--off);
-  transition: background .3s, box-shadow .3s;
-  position: relative;
+.card:hover::before,.power-card:hover::before,.signal-card:hover::before,.phase-card:hover::before{
+  opacity:1;
 }
 
-.led-bulb::after {
-  content: '';
-  position: absolute;
-  top: 20%; left: 20%;
-  width: 30%; height: 30%;
-  border-radius: 50%;
-  background: rgba(255,255,255,.15);
+.card:hover,.power-card:hover,.signal-card:hover,.phase-card:hover{
+  transform:translateY(-3px);
+  box-shadow:0 10px 30px rgba(0,0,0,0.3),0 0 20px rgba(233,161,255,0.2);
+  border-color:var(--purple);
 }
 
-.led-bulb.active-red    { background: var(--red);    box-shadow: 0 0 20px var(--red),    0 0 60px #ff3b3b88; border-color: #ff6060; }
-.led-bulb.active-yellow { background: var(--yellow); box-shadow: 0 0 20px var(--yellow), 0 0 60px #ffd70088; border-color: #ffee55; }
-.led-bulb.active-green  { background: var(--green);  box-shadow: 0 0 20px var(--green),  0 0 60px #00e87a88; border-color: #55ffaa; }
-
-.tl-label {
-  font-size: .7rem;
-  color: var(--dim);
-  letter-spacing: 2px;
+.bulb{
+  animation:none;
 }
 
-/* Master Power */
-.master-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.master-row span { font-size: .8rem; }
+.bulb.on-red{animation:pulseRed 1.5s ease-in-out infinite}
+.bulb.on-yellow{animation:pulseYellow 1.5s ease-in-out infinite}
+.bulb.on-green{animation:pulseGreen 1.5s ease-in-out infinite}
 
-.toggle-switch {
-  position: relative;
-  width: 44px; height: 24px;
+@keyframes pulseRed{
+  0%,100%{box-shadow:0 0 22px var(--red),0 0 40px var(--red-glow)}
+  50%{box-shadow:0 0 30px var(--red),0 0 60px var(--red-glow),0 0 80px rgba(255,107,157,0.3)}
 }
-.toggle-switch input { display: none; }
-.toggle-slider {
-  position: absolute;
-  inset: 0;
-  background: #1a2035;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: background .3s;
-  border: 1px solid var(--border);
+
+@keyframes pulseYellow{
+  0%,100%{box-shadow:0 0 22px var(--yellow),0 0 40px var(--yel-glow)}
+  50%{box-shadow:0 0 30px var(--yellow),0 0 60px var(--yel-glow),0 0 80px rgba(255,217,61,0.3)}
 }
-.toggle-slider::before {
+
+@keyframes pulseGreen{
+  0%,100%{box-shadow:0 0 22px var(--green),0 0 40px var(--grn-glow)}
+  50%{box-shadow:0 0 30px var(--green),0 0 60px var(--grn-glow),0 0 80px rgba(107,203,119,0.3)}
+}
+
+.tog-thumb{
+  box-shadow:0 0 10px rgba(255,255,255,0.3);
+}
+
+.tog input:checked~.tog-thumb{
+  animation:glowPulse 2s ease-in-out infinite;
+}
+
+@keyframes glowPulse{
+  0%,100%{box-shadow:0 0 10px var(--green),0 0 20px rgba(107,203,119,0.5)}
+  50%{box-shadow:0 0 15px var(--green),0 0 30px rgba(107,203,119,0.8),0 0 40px rgba(107,203,119,0.4)}
+}
+
+.pill{
+  transition:all .3s ease;
+}
+
+.pill:hover{
+  transform:scale(1.05);
+  box-shadow:0 0 15px rgba(233,161,255,0.3);
+}
+
+.hd-btn{
+  transition:all .3s ease;
+  position:relative;
+  overflow:hidden;
+}
+
+.hd-btn::after{
   content:'';
-  position: absolute;
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: var(--dim);
-  top: 2px; left: 2px;
-  transition: transform .3s, background .3s;
-}
-.toggle-switch input:checked + .toggle-slider { background: #002a18; border-color: var(--green); }
-.toggle-switch input:checked + .toggle-slider::before {
-  transform: translateX(20px);
-  background: var(--green);
-  box-shadow: 0 0 8px var(--green);
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:0;
+  height:0;
+  background:rgba(255,255,255,0.2);
+  border-radius:50%;
+  transform:translate(-50%,-50%);
+  transition:width .3s ease,height .3s ease;
 }
 
-/* Mode Toggle */
-.mode-toggle {
-  display: flex;
-  background: #060a14;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-  width: 100%;
-}
-.mode-btn {
-  flex: 1;
-  padding: .6rem;
-  text-align: center;
-  font-family: 'Orbitron', sans-serif;
-  font-size: .6rem;
-  letter-spacing: 2px;
-  cursor: pointer;
-  color: var(--dim);
-  background: transparent;
-  border: none;
-  transition: all .2s;
-}
-.mode-btn.active { background: var(--accent); color: #000; font-weight: 600; }
-
-/* Manual light buttons */
-.light-btns {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
-  gap: .5rem;
+.hd-btn:hover::after{
+  width:100px;
+  height:100px;
 }
 
-.light-btn {
-  padding: .7rem .3rem;
-  border-radius: 6px;
-  border: 2px solid var(--border);
-  background: #060a14;
-  cursor: pointer;
-  font-family: 'Orbitron', sans-serif;
-  font-size: .55rem;
-  letter-spacing: 1px;
-  color: var(--dim);
-  transition: all .2s;
-  text-transform: uppercase;
+.scene-wrap{
+  box-shadow:inset 0 0 30px rgba(0,0,0,0.3);
+  transition:all .3s ease;
 }
 
-.light-btn:hover { border-color: var(--accent); color: var(--accent); }
-.light-btn.btn-red.active    { background: #2a0808; border-color: var(--red);    color: var(--red);    box-shadow: 0 0 12px #ff3b3b44; }
-.light-btn.btn-yellow.active { background: #2a2200; border-color: var(--yellow); color: var(--yellow); box-shadow: 0 0 12px #ffd70044; }
-.light-btn.btn-green.active  { background: #002218; border-color: var(--green);  color: var(--green);  box-shadow: 0 0 12px #00e87a44; }
-.light-btn.btn-off.active    { background: #0a0a14; border-color: var(--dim);    color: var(--text); }
-
-/* Timer Sliders */
-.timer-row {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  margin-bottom: .75rem;
-}
-.timer-row:last-child { margin-bottom: 0; }
-
-.timer-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.timer-dot.red    { background: var(--red); }
-.timer-dot.yellow { background: var(--yellow); }
-.timer-dot.green  { background: var(--green); }
-
-.timer-row label { font-size: .7rem; color: var(--dim); width: 50px; flex-shrink: 0; }
-
-input[type=range] {
-  flex: 1;
-  -webkit-appearance: none;
-  height: 3px;
-  border-radius: 3px;
-  background: var(--border);
-  outline: none;
-}
-input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: var(--accent);
-  cursor: pointer;
-  box-shadow: 0 0 8px var(--accent);
+.scene-wrap:hover{
+  box-shadow:inset 0 0 30px rgba(0,0,0,0.3),0 0 20px rgba(233,161,255,0.15);
 }
 
-.timer-val { font-size: .75rem; color: var(--accent); width: 32px; text-align: right; flex-shrink: 0; }
-
-/* Phase Progress Bar */
-.phase-bar-wrap { margin-top: .75rem; }
-.phase-label { display: flex; justify-content: space-between; font-size: .65rem; color: var(--dim); margin-bottom: .3rem; }
-.phase-bar-bg { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
-.phase-bar-fill {
-  height: 100%;
-  width: 0%;
-  border-radius: 4px;
-  background: var(--accent);
-  transition: background .3s;
+.log-item:hover{
+  background:rgba(255,255,255,0.05);
+  transform:translateX(5px);
+  transition:all .2s ease;
 }
-.phase-bar-fill.red    { background: var(--red); }
-.phase-bar-fill.yellow { background: var(--yellow); }
-.phase-bar-fill.green  { background: var(--green); }
 
-/* Save button */
-.save-btn {
-  width: 100%;
-  padding: .75rem;
-  background: var(--accent);
-  color: #000;
-  border: none;
-  border-radius: 6px;
-  font-family: 'Orbitron', sans-serif;
-  font-size: .65rem;
-  font-weight: 600;
-  letter-spacing: 3px;
-  cursor: pointer;
-  transition: all .2s;
-  text-transform: uppercase;
+.act-item{
+  transition:all .2s ease;
 }
-.save-btn:hover { background: #33ddff; box-shadow: 0 0 20px #00d4ff55; }
-.save-btn:active { transform: scale(.97); }
-.save-btn.saving { opacity: .6; cursor: wait; }
 
-/* Device info */
-.info-row { display: flex; justify-content: space-between; font-size: .7rem; padding: .25rem 0; border-bottom: 1px solid #ffffff06; }
-.info-row .key { color: var(--dim); }
-.info-row .val { color: var(--text); }
-.online-chip { display: inline-block; padding: .1rem .4rem; border-radius: 4px; font-size: .65rem; }
-.online-chip.on  { background: #00280f; color: var(--green); border: 1px solid var(--green); }
-.online-chip.off { background: #1a0808; color: var(--red);   border: 1px solid var(--red); }
-
-/* Log */
-.log-list { list-style: none; max-height: 160px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
-.log-list li { display: flex; align-items: center; gap: .5rem; padding: .3rem 0; border-bottom: 1px solid #ffffff08; font-size: .7rem; color: var(--dim); }
-.log-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.log-dot.red    { background: var(--red); }
-.log-dot.yellow { background: var(--yellow); }
-.log-dot.green  { background: var(--green); }
-.log-dot.off    { background: var(--dim); }
-.log-time { color: #364a66; font-size: .65rem; margin-left: auto; }
-
-/* Road Scene */
-.scene { position: relative; overflow: hidden; background: #0c1020; }
-canvas#road { display: block; width: 100%; height: 100%; }
-
-/* Config Modal */
-.modal-overlay { display: none; position: fixed; inset: 0; background: #000a; z-index: 100; align-items: center; justify-content: center; }
-.modal-overlay.open { display: flex; }
-.modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; width: 420px; max-width: 95vw; }
-.modal h3 { font-family: 'Orbitron', sans-serif; font-size: .8rem; letter-spacing: 3px; color: var(--accent); margin-bottom: 1.5rem; }
-.form-group { margin-bottom: 1rem; }
-.form-group label { display: block; font-size: .7rem; color: var(--dim); margin-bottom: .4rem; }
-.form-group input { width: 100%; padding: .6rem .8rem; background: #060a14; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: .8rem; outline: none; }
-.form-group input:focus { border-color: var(--accent); }
-.modal-btns { display: flex; gap: .75rem; margin-top: 1.5rem; }
-.modal-btns button { flex: 1; padding: .7rem; border-radius: 6px; border: 1px solid var(--border); font-family: 'Orbitron', sans-serif; font-size: .6rem; letter-spacing: 2px; cursor: pointer; }
-.btn-save-cfg { background: var(--accent); color: #000; border-color: var(--accent); }
-.btn-cancel   { background: transparent; color: var(--dim); }
-
-.cfg-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--dim); padding: .3rem .6rem; cursor: pointer; font-size: .8rem; transition: all .2s; }
-.cfg-btn:hover { border-color: var(--accent); color: var(--accent); }
-
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-@media(max-width:900px){
-  .main-grid { grid-template-columns: 1fr; }
-  .scene { height: 320px; }
+.act-item:hover{
+  transform:translateX(5px);
+  background:rgba(233,161,255,0.1);
+  border-color:var(--purple);
 }
+
+.signal-label{
+  animation:none;
+}
+
+.signal-label.red{animation:textGlowRed 2s ease-in-out infinite}
+.signal-label.yellow{animation:textGlowYellow 2s ease-in-out infinite}
+.signal-label.green{animation:textGlowGreen 2s ease-in-out infinite}
+
+@keyframes textGlowRed{
+  0%,100%{text-shadow:0 0 10px var(--red)}
+  50%{text-shadow:0 0 20px var(--red),0 0 30px rgba(255,107,157,0.5)}
+}
+
+@keyframes textGlowYellow{
+  0%,100%{text-shadow:0 0 10px var(--yellow)}
+  50%{text-shadow:0 0 20px var(--yellow),0 0 30px rgba(255,217,61,0.5)}
+}
+
+@keyframes textGlowGreen{
+  0%,100%{text-shadow:0 0 10px var(--green)}
+  50%{text-shadow:0 0 20px var(--green),0 0 30px rgba(107,203,119,0.5)}
+}
+
+.badge{
+  transition:all .2s ease;
+}
+
+.badge:hover{
+  transform:scale(1.1);
+  box-shadow:0 0 10px currentColor;
+}
+
+.bar-fill{
+  position:relative;
+  overflow:hidden;
+}
+
+.bar-fill::after{
+  content:'';
+  position:absolute;
+  top:0;
+  left:-100%;
+  width:100%;
+  height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);
+  animation:shimmer 2s infinite;
+}
+
+@media(max-width:1200px){.page{grid-template-columns:260px 1fr}}
+@media(max-width:820px){.page{grid-template-columns:1fr;padding:.75rem}}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>⚡ Traffic Control Center</h1>
-  <div style="display:flex;align-items:center;gap:1rem;">
-    <div class="status-badge" id="connBadge">
-      <div class="dot"></div>
-      <span id="connText">DISCONNECTED</span>
+  <div class="brand">
+    <div class="brand-icon">
+      <div class="brand-dot"></div><div class="brand-dot"></div><div class="brand-dot"></div>
     </div>
-    <button class="cfg-btn" onclick="openConfig()">⚙ CONFIG</button>
+    LUMIN / TRAFFIC
+  </div>
+  <div class="hd-right">
+    <div class="pill" id="dbPill"><div class="dot"></div><span id="dbText">CONNECTING</span></div>
+    <div class="pill serial-pill" id="serialPill" onclick="openSerialModal()"><div class="dot"></div><span id="serialText">SERIAL</span></div>
+    <button class="hd-btn" onclick="openSerialModal()">⚙ Serial</button>
   </div>
 </header>
 
-<div class="main-grid">
-  <div class="side-panel">
-
-    <!-- Traffic Light Widget -->
-    <div class="panel-section">
-      <h2>Signal Status</h2>
-      <div class="tl-widget">
-        <div class="tl-housing">
-          <div class="led-bulb" id="ledRed"></div>
-          <div class="led-bulb" id="ledYellow"></div>
-          <div class="led-bulb" id="ledGreen"></div>
-        </div>
-        <span class="tl-label" id="lightLabel">● OFF</span>
+<div class="page">
+  <!-- LEFT -->
+  <div class="col">
+    <div class="power-card">
+      <div>
+        <div class="power-label">Master Power</div>
+        <div class="power-sub" id="powerSub">System is OFF</div>
       </div>
-      <div class="phase-bar-wrap">
-        <div class="phase-label">
-          <span id="phaseInfo">Phase</span>
-          <span id="phaseCountdown">--s</span>
-        </div>
-        <div class="phase-bar-bg"><div class="phase-bar-fill" id="phaseBar"></div></div>
-      </div>
+      <label class="tog">
+        <input type="checkbox" id="masterToggle" onchange="onMasterChange()"/>
+        <div class="tog-track"></div><div class="tog-thumb"></div>
+      </label>
     </div>
 
-    <!-- Device Info -->
-    <div class="panel-section">
-      <h2>Device Info</h2>
-      <div class="info-row"><span class="key">ID</span><span class="val" id="infoId">--</span></div>
-      <div class="info-row"><span class="key">Location</span><span class="val" id="infoLoc">--</span></div>
-      <div class="info-row"><span class="key">Mode</span><span class="val" id="infoMode">--</span></div>
-      <div class="info-row"><span class="key">Status</span><span class="val"><span class="online-chip off" id="onlineChip">OFFLINE</span></span></div>
-      <div class="info-row"><span class="key">Last Seen</span><span class="val" id="infoLastSeen">--</span></div>
-    </div>
-
-    <!-- Master Switch — MANUAL power on/off -->
-    <div class="panel-section">
-      <div class="master-row">
-        <span>MASTER POWER</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="masterSwitch" onchange="onMasterChange()"/>
-          <div class="toggle-slider"></div>
-        </label>
+    <div class="signal-card">
+      <div class="card-label" style="margin-bottom:.5rem;width:100%">Signal</div>
+      <div class="tl-housing">
+        <div class="bulb" id="bulbRed"></div>
+        <div class="bulb" id="bulbYellow"></div>
+        <div class="bulb" id="bulbGreen"></div>
+        <div class="tl-post"></div>
+      </div>
+      <div class="signal-label" id="signalLabel">OFF</div>
+      <div class="ring-wrap">
+        <svg class="ring-svg" width="90" height="90" viewBox="0 0 90 90">
+          <circle class="ring-track" cx="45" cy="45" r="37"/>
+          <circle class="ring-fill" id="ringArc" cx="45" cy="45" r="37"
+            stroke-dasharray="232.5" stroke-dashoffset="232.5" stroke="var(--muted)"/>
+          <text id="ringNum" class="ring-text" x="45" y="45" transform="rotate(90,45,45)">--</text>
+          <text class="ring-unit" x="45" y="62" transform="rotate(90,45,45)">SEC</text>
+        </svg>
       </div>
     </div>
 
-    <!-- Mode -->
-    <div class="panel-section">
-      <h2>Mode</h2>
-      <div class="mode-toggle">
-        <button class="mode-btn active" id="btnAuto"   onclick="setMode('auto')">AUTO</button>
-        <button class="mode-btn"        id="btnManual" onclick="setMode('manual')">MANUAL</button>
+    <div class="phase-card">
+      <div class="phase-hd">
+        <div class="phase-name" id="phaseName">IDLE</div>
+        <div class="phase-rem" id="phaseRem">—</div>
       </div>
+      <div class="bar-bg"><div class="bar-fill" id="barFill" style="width:0%;background:var(--muted)"></div></div>
     </div>
 
-    <!-- Manual Light Control -->
-    <div class="panel-section" id="manualSection" style="display:none;">
-      <h2>Manual Light</h2>
-      <div class="light-btns">
-        <button class="light-btn btn-red"    onclick="setManualLight('red')">RED</button>
-        <button class="light-btn btn-yellow" onclick="setManualLight('yellow')">YLW</button>
-        <button class="light-btn btn-green"  onclick="setManualLight('green')">GRN</button>
-        <button class="light-btn btn-off"    onclick="setManualLight('off')">OFF</button>
+    <div class="card">
+      <div class="card-label">Device</div>
+      <div class="info-tbl">
+        <div class="info-row"><span class="info-k">ID</span><span class="info-v" id="devId">—</span></div>
+        <div class="info-row"><span class="info-k">Location</span><span class="info-v" id="devLoc">—</span></div>
+        <div class="info-row"><span class="info-k">Status</span><span class="info-v"><span class="badge b-off" id="onlineChip">OFFLINE</span></span></div>
+        <div class="info-row"><span class="info-k">Last Seen</span><span class="info-v" id="lastSeen">—</span></div>
+        <div class="info-row"><span class="info-k">Mode</span><span class="info-v"><span class="badge b-auto" id="modeChip">AUTO</span></span></div>
+        <div class="info-row"><span class="info-k">Serial</span><span class="info-v"><span class="badge b-off" id="serialChip">DISCONNECTED</span></span></div>
       </div>
     </div>
-
-    <!-- Auto Timers -->
-    <div class="panel-section" id="autoSection">
-      <h2>Phase Durations (sec)</h2>
-      <div class="timer-row">
-        <div class="timer-dot red"></div>
-        <label>RED</label>
-        <input type="range" min="5" max="120" value="30" id="slRed" oninput="updSlider('red',this.value)"/>
-        <span class="timer-val" id="valRed">30</span>
-      </div>
-      <div class="timer-row">
-        <div class="timer-dot yellow"></div>
-        <label>YELLOW</label>
-        <input type="range" min="2" max="30" value="5" id="slYellow" oninput="updSlider('yellow',this.value)"/>
-        <span class="timer-val" id="valYellow">5</span>
-      </div>
-      <div class="timer-row">
-        <div class="timer-dot green"></div>
-        <label>GREEN</label>
-        <input type="range" min="5" max="120" value="25" id="slGreen" oninput="updSlider('green',this.value)"/>
-        <span class="timer-val" id="valGreen">25</span>
-      </div>
-    </div>
-
-    <!-- Save & Apply -->
-    <div class="panel-section">
-      <button class="save-btn" id="saveBtn" onclick="saveConfig()">▶ APPLY CONFIG</button>
-    </div>
-
-    <!-- Log -->
-    <div class="panel-section" style="flex:1;">
-      <h2>Event Log</h2>
-      <ul class="log-list" id="logList"></ul>
-    </div>
-
   </div>
 
-  <!-- Road Scene -->
-  <div class="scene">
-    <canvas id="road"></canvas>
+  <!-- CENTER -->
+  <div class="col">
+    <div class="scene-wrap"><canvas id="roadCanvas"></canvas></div>
+    <div class="err-banner" id="errBanner"></div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="col">
+    <div class="card" style="flex:1">
+      <div class="card-label">Live Log</div>
+      <ul class="log-list" id="logList"></ul>
+    </div>
+    <div class="card">
+      <div class="card-label">Recent Activity</div>
+      <div class="act-list" id="actList"><div style="font-size:.65rem;color:var(--subtle);padding:.5rem 0">Loading…</div></div>
+    </div>
   </div>
 </div>
 
-<!-- Config Modal -->
-<div class="modal-overlay" id="cfgModal">
+<!-- SERIAL MODAL -->
+<div class="overlay" id="serialOverlay">
   <div class="modal">
-    <h3>☁ SUPABASE CONNECTION</h3>
-    <div class="form-group">
-      <label>Project URL</label>
-      <input type="text" id="cfgUrl" placeholder="https://xjyvtiudpgpnmwbjxaux.supabase.co"/>
+    <h2>SERIAL CONNECTION</h2>
+    <div class="modal-err" id="serialErr"></div>
+    <div class="field">
+      <label>BAUD RATE</label>
+      <select id="baudSelect">
+        <option value="115200" selected>115200</option>
+        <option value="9600">9600</option>
+        <option value="57600">57600</option>
+        <option value="38400">38400</option>
+      </select>
     </div>
-    <div class="form-group">
-      <label>Anon Key</label>
-      <input type="text" id="cfgKey" placeholder="sb_publishable_Vx33MOF0kKgpHCI2h9IVPQ_cj_bpIlx"/>
-    </div>
-    <div class="form-group">
-      <label>Device ID</label>
-      <input type="text" id="cfgDevice" placeholder="ESP32_TL_001" value="ESP32_TL_001"/>
+    <div class="field">
+      <label>SERIAL MONITOR</label>
+      <div class="smon" id="serialLog">— waiting for connection —
+</div>
     </div>
     <div class="modal-btns">
-      <button class="btn-cancel"   onclick="closeConfig()">CANCEL</button>
-      <button class="btn-save-cfg" onclick="applyConfig()">CONNECT</button>
+      <button class="btn-ok" id="serialConnBtn" onclick="connectSerial()">CONNECT</button>
+      <button class="btn-disc" id="serialDiscBtn" onclick="disconnectSerial()" style="display:none">DISCONNECT</button>
+      <button class="btn-cancel" onclick="closeSerialModal()">CLOSE</button>
     </div>
   </div>
 </div>
 
 <script>
-// ── Supabase Config ──────────────────────────────────────
-let SUPA_URL  = localStorage.getItem('sb_url')    || '';
-let SUPA_KEY  = localStorage.getItem('sb_key')    || '';
-let DEVICE_ID = localStorage.getItem('sb_device') || 'ESP32_TL_001';
-let supabase  = null;
-let realtimeCh = null;
+// ══════════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════════
+const SUPA_URL  = 'https://xjyvtiudpgpnmwbjxaux.supabase.co';
+const SUPA_KEY  = 'sb_publishable_Vx33MOF0kKgpHCI2h9IVPQ_cj_bpIlx';
+const DEVICE_ID = 'ESP32_TL_001';
+const CIRC      = 2 * Math.PI * 37; // 232.5
 
-// ── UI State ─────────────────────────────────────────────
-// enabled = MASTER POWER — must be manually turned on by the user.
-// Once on, if mode is 'auto', lights cycle automatically.
-// If mode is 'manual', user picks the light.
-let uiState = {
-  mode:          'auto',
-  enabled:       false,   // ← starts OFF; user must manually switch ON
-  manualLight:   'red',
-  redDuration:   30,
-  yellowDuration: 5,
-  greenDuration: 25,
-  currentLight:  'off'    // what the ESP32 reports / what auto cycle is on
+// Fixed durations matching Arduino constants
+const DUR = { red: 30, prep: 3, yellow: 5, green: 25, off: 0 };
+
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+// The dashboard is a PURE DISPLAY — it never calculates time itself.
+// The ESP32 writes remaining_time to DB every 1 second.
+// The dashboard reads that value and shows it. No local countdown.
+
+const S = {
+  enabled:      false,
+  currentLight: 'off',
+  remainingTime: 0,
+  mode:         'auto',
+  online:       false,
+  location:     '—',
+  lastSeen:     '—'
 };
 
-// ── Auto-cycle state (dashboard-side preview when not connected) ─
-const CYCLE_ORDER = ['green', 'yellow', 'red'];
-let cycleIdx      = 0;          // index into CYCLE_ORDER
-let cycleTimer    = null;       // setInterval handle
-let phaseElapsed  = 0;          // ms elapsed in current phase
-let phaseBarRaf   = null;
+let lastDBLight   = '';
+let isWriting     = false;
+let dbStatus      = '';
+let sb = null, rtChannel = null, pollTimer = null;
 
-// ── DOM refs ─────────────────────────────────────────────
-const ledRed    = document.getElementById('ledRed');
-const ledYellow = document.getElementById('ledYellow');
-const ledGreen  = document.getElementById('ledGreen');
+// Serial
+let serialPort = null, serialReader = null, serialConnected = false, serialBuffer = '';
 
-// ═════════════════════════════════════════════════════════
-//  INIT
-// ═════════════════════════════════════════════════════════
-window.addEventListener('load', () => {
-  document.getElementById('cfgUrl').value    = SUPA_URL;
-  document.getElementById('cfgKey').value    = SUPA_KEY;
-  document.getElementById('cfgDevice').value = DEVICE_ID;
-
-  // Start with everything showing OFF correctly
-  syncUI();
-
-  if (SUPA_URL && SUPA_KEY) initSupabase();
-  else openConfig();
-
-  startRoadAnimation();
+// ══════════════════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  initCanvas();
+  initSupabase();
 });
 
-// ═════════════════════════════════════════════════════════
-//  SUPABASE
-// ═════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// SUPABASE
+// ══════════════════════════════════════════════════════════
 function initSupabase() {
-  if (realtimeCh) realtimeCh.unsubscribe();
-  supabase = window.supabase.createClient(SUPA_URL, SUPA_KEY);
-  setConnected(false);
-  fetchDeviceState().then(() => subscribeRealtime());
+  setDBPill('loading');
+  try { sb = window.supabase.createClient(SUPA_URL, SUPA_KEY); }
+  catch(e) { setDBPill('err'); showBanner(e.message); return; }
+
+  fetchAll().then(ok => {
+    if (ok) { subscribeRealtime(); fetchActivity(); }
+  });
+
+  pollTimer = setInterval(pollDB, 1000);
 }
 
-async function fetchDeviceState() {
-  if (!supabase) return;
+async function fetchAll() {
+  if (!sb) return false;
   try {
-    const { data, error } = await supabase
-      .from('v_device_status')
-      .select('*')
+    const [cr, dr] = await Promise.all([
+      sb.from('device_config').select('*').eq('device_id', DEVICE_ID).single(),
+      sb.from('devices').select('*').eq('device_id', DEVICE_ID).single()
+    ]);
+    if (cr.error) throw cr.error;
+    ingestDBRow(cr.data);
+    if (dr.data) ingestDevice(dr.data);
+    setDBPill('ok'); hideBanner(); return true;
+  } catch(e) { setDBPill('err'); showBanner('DB: ' + e.message); return false; }
+}
+
+async function pollDB() {
+  if (!sb) return;
+  try {
+    const { data: cr, error } = await sb.from('device_config')
+      .select('enabled,current_light,remaining_time,mode')
       .eq('device_id', DEVICE_ID)
       .single();
-    if (error) throw error;
-    if (data) { applyRemoteState(data); setConnected(true); }
-  } catch(e) {
-    console.warn('fetchDeviceState:', e.message);
-    setConnected(false);
+    if (error) { setDBPill('err'); return; }
+    if (cr) { ingestDBRow(cr); setDBPill('ok'); }
+  } catch(e) { setDBPill('err'); }
+}
+
+function ingestDBRow(c) {
+  const lightChanged = (c.current_light !== lastDBLight);
+  const wasEnabled = S.enabled;
+
+  S.enabled = c.enabled;
+  S.mode = c.mode;
+  S.currentLight = c.current_light;
+  S.remainingTime = c.remaining_time || 0;
+
+  if (!c.enabled) {
+    lastDBLight = 'off';
+    S.remainingTime = 0;
+    S.currentLight = 'off';
+    render();
+    if (wasEnabled) addLog('off', 'System DISABLED');
+    return;
   }
+
+  lastDBLight = c.current_light;
+  if (lightChanged) {
+    addLog(c.current_light, `→ ${c.current_light.toUpperCase()} (${c.remaining_time}s)`);
+  }
+  render();
+}
+
+function ingestDevice(d) {
+  S.online   = d.online;
+  S.location = d.location || '—';
+  S.lastSeen = d.last_seen ? new Date(d.last_seen).toLocaleTimeString() : '—';
+  render();
 }
 
 function subscribeRealtime() {
-  if (!supabase) return;
-  realtimeCh = supabase
-    .channel('device_config_changes')
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'device_config', filter: `device_id=eq.${DEVICE_ID}` },
-      payload => {
-        const d = payload.new;
-        applyRemoteState({
-          mode: d.mode, enabled: d.enabled,
-          manual_light: d.manual_light,
-          current_light: d.current_light,
-          red_duration: d.red_duration,
-          yellow_duration: d.yellow_duration,
-          green_duration: d.green_duration
-        });
-      })
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'devices', filter: `device_id=eq.${DEVICE_ID}` },
-      payload => updateDeviceInfo(payload.new))
-    .subscribe(status => setConnected(status === 'SUBSCRIBED'));
+  if (rtChannel) { rtChannel.unsubscribe(); rtChannel = null; }
+  rtChannel = sb.channel('lumin_rt_' + Date.now())
+    .on('postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'device_config', filter: `device_id=eq.${DEVICE_ID}` },
+      pl => { if (!isWriting) ingestDBRow(pl.new); })
+    .on('postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'devices', filter: `device_id=eq.${DEVICE_ID}` },
+      pl => { ingestDevice(pl.new); })
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'traffic_log', filter: `device_id=eq.${DEVICE_ID}` },
+      pl => { prependActivity(pl.new); })
+    .subscribe(st => {
+      if (st === 'SUBSCRIBED') { addLog('info', 'Realtime connected'); setDBPill('ok'); }
+      else if (st === 'CHANNEL_ERROR') addLog('warn', 'Realtime error — polling active');
+    });
 }
 
-function applyRemoteState(data) {
-  uiState.mode           = data.mode            ?? uiState.mode;
-  uiState.enabled        = data.enabled         ?? uiState.enabled;
-  uiState.manualLight    = data.manual_light     ?? uiState.manualLight;
-  uiState.currentLight   = data.current_light   ?? uiState.currentLight;
-  uiState.redDuration    = data.red_duration    ?? uiState.redDuration;
-  uiState.yellowDuration = data.yellow_duration ?? uiState.yellowDuration;
-  uiState.greenDuration  = data.green_duration  ?? uiState.greenDuration;
-
-  // Sync cycle index to match current_light from ESP32
-  if (uiState.mode === 'auto' && uiState.currentLight !== 'off') {
-    const idx = CYCLE_ORDER.indexOf(uiState.currentLight);
-    if (idx !== -1) cycleIdx = idx;
-  }
-
-  syncUI();
-
-  if (data.device_id) {
-    document.getElementById('infoId').textContent  = data.device_id || '--';
-    document.getElementById('infoLoc').textContent = data.location  || '--';
-  }
-  if (data.online !== undefined) updateDeviceInfo(data);
+async function fetchActivity() {
+  if (!sb) return;
+  const { data } = await sb.from('traffic_log').select('*')
+    .eq('device_id', DEVICE_ID).order('created_at', { ascending: false }).limit(20);
+  if (!data) return;
+  const list = document.getElementById('actList'); list.innerHTML = '';
+  if (!data.length) { list.innerHTML = '<div style="font-size:.65rem;color:var(--subtle);padding:.5rem 0">No activity yet</div>'; return; }
+  data.forEach(r => prependActivity(r, false));
 }
 
-function updateDeviceInfo(d) {
-  if (d.online !== undefined) {
-    const chip = document.getElementById('onlineChip');
-    chip.textContent = d.online ? 'ONLINE' : 'OFFLINE';
-    chip.className   = 'online-chip ' + (d.online ? 'on' : 'off');
-  }
-  if (d.last_seen) {
-    document.getElementById('infoLastSeen').textContent = new Date(d.last_seen).toLocaleTimeString();
-  }
+function prependActivity(r, pre = true) {
+  const list = document.getElementById('actList');
+  const el   = document.createElement('div'); el.className = 'act-item';
+  const t    = r.created_at ? new Date(r.created_at).toLocaleTimeString() : '';
+  const lc   = (r.light || 'off').toLowerCase();
+  el.innerHTML = `<div class="act-dot ${lc}"></div><div class="act-info"><div class="act-name">${lc.toUpperCase()}</div><div class="act-src">${r.source||'?'} · ${r.mode||'?'}</div></div><div class="act-time">${t}</div>`;
+  if (pre) { list.insertBefore(el, list.firstChild); while (list.children.length > 20) list.removeChild(list.lastChild); }
+  else list.appendChild(el);
 }
 
-async function saveConfig() {
-  if (!supabase) { openConfig(); return; }
-  const btn = document.getElementById('saveBtn');
-  btn.classList.add('saving');
-  btn.textContent = '⏳ SAVING…';
-
-  const patch = {
-    mode:            uiState.mode,
-    enabled:         uiState.enabled,
-    manual_light:    uiState.manualLight,
-    red_duration:    uiState.redDuration,
-    yellow_duration: uiState.yellowDuration,
-    green_duration:  uiState.greenDuration
-  };
-
+async function writeToDB(patch) {
+  if (!sb) return false;
+  isWriting = true;
   try {
-    const { error } = await supabase
-      .from('device_config')
-      .update(patch)
-      .eq('device_id', DEVICE_ID);
-    if (error) throw error;
+    const { error } = await sb.from('device_config').update(patch).eq('device_id', DEVICE_ID);
+    if (error) throw error; return true;
+  } catch(e) { showBanner('Write failed: ' + e.message); return false; }
+  finally { setTimeout(() => { isWriting = false; }, 500); }
+}
 
-    const lightVal = uiState.mode === 'manual' ? uiState.manualLight : uiState.currentLight;
-    await supabase.from('traffic_log').insert({
-      device_id: DEVICE_ID,
-      light: lightVal === 'off' ? 'off' : lightVal,
-      mode:  uiState.mode,
-      source:'dashboard'
-    });
-
-    addLog(lightVal, 'Config applied');
-    btn.textContent = '✓ APPLIED';
-    setTimeout(() => { btn.textContent = '▶ APPLY CONFIG'; btn.classList.remove('saving'); }, 1500);
-  } catch(e) {
-    btn.textContent = '✗ ERROR';
-    setTimeout(() => { btn.textContent = '▶ APPLY CONFIG'; btn.classList.remove('saving'); }, 2000);
-    console.error(e);
+async function onMasterChange() {
+  const enabled = document.getElementById('masterToggle').checked;
+  S.enabled = enabled;
+  if (!enabled) {
+    S.remainingTime = 0;
+    S.currentLight = 'off';
+  }
+  render();
+  const ok = await writeToDB({ enabled });
+  if (ok) {
+    addLog(enabled ? 'green' : 'off', 'System ' + (enabled ? 'ENABLED' : 'DISABLED'));
+    sendSerial(enabled ? 'ENABLE' : 'DISABLE');
+    if (enabled) setTimeout(fetchAll, 600);
   }
 }
 
-// ═════════════════════════════════════════════════════════
-//  UI CONTROLS  (user actions — dashboard side only)
-// ═════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// RENDER — pure display, no computation
+// ══════════════════════════════════════════════════════════
+function render() {
+  document.getElementById('masterToggle').checked = S.enabled;
+  const ps = document.getElementById('powerSub');
+  ps.textContent = S.enabled ? 'System is ON' : 'System is OFF';
+  ps.className   = 'power-sub' + (S.enabled ? ' on' : '');
 
-// MASTER POWER — must be manually toggled by user
-function onMasterChange() {
-  uiState.enabled = document.getElementById('masterSwitch').checked;
-  if (uiState.enabled) {
-    addLog('green', 'System powered ON');
-    if (uiState.mode === 'auto') startAutoCycle();
+  const dLight = S.enabled ? (S.currentLight || 'off') : 'off';
+
+  const bR = document.getElementById('bulbRed');
+  const bY = document.getElementById('bulbYellow');
+  const bG = document.getElementById('bulbGreen');
+  const wR = (dLight === 'red' || dLight === 'prep') ? 'bulb on-red' : 'bulb';
+  const wY = (dLight === 'yellow' || dLight === 'prep') ? 'bulb on-yellow' : 'bulb';
+  const wG = dLight === 'green'  ? 'bulb on-green'  : 'bulb';
+  if (bR.className !== wR) bR.className = wR;
+  if (bY.className !== wY) bY.className = wY;
+  if (bG.className !== wG) bG.className = wG;
+
+  const lbl = document.getElementById('signalLabel');
+  lbl.textContent = dLight.toUpperCase();
+  lbl.className   = 'signal-label' + (dLight !== 'off' ? ' ' + dLight : '');
+
+  const mc = document.getElementById('modeChip');
+  mc.textContent = (S.mode || 'auto').toUpperCase(); mc.className = 'badge b-auto';
+  const oc = document.getElementById('onlineChip');
+  oc.textContent = S.online ? 'ONLINE' : 'OFFLINE'; oc.className = 'badge ' + (S.online ? 'b-on' : 'b-off');
+  document.getElementById('devId').textContent   = DEVICE_ID;
+  document.getElementById('devLoc').textContent   = S.location;
+  document.getElementById('lastSeen').textContent = S.lastSeen;
+
+  const rem = S.enabled && dLight !== 'off' ? S.remainingTime : 0;
+  const dur = DUR[dLight] || 0;
+  const arc = document.getElementById('ringArc');
+  const num = document.getElementById('ringNum');
+
+  if (!S.enabled || dLight === 'off' || dur === 0) {
+    arc.setAttribute('stroke-dashoffset', CIRC.toFixed(2));
+    arc.setAttribute('stroke', 'var(--muted)');
+    num.textContent = '--'; num.setAttribute('fill', 'var(--muted)');
   } else {
-    addLog('off', 'System powered OFF');
-    stopAutoCycle();
-    uiState.currentLight = 'off';
+    const pct = Math.max(0, Math.min(1, rem / dur));
+    arc.setAttribute('stroke-dashoffset', (CIRC * (1 - pct)).toFixed(2));
+    const col = dLight === 'red' ? 'var(--red)' :
+                dLight === 'prep' ? 'var(--yellow)' :
+                dLight === 'yellow' ? 'var(--yellow)' : 'var(--green)';
+    arc.setAttribute('stroke', col);
+    num.textContent = rem; num.setAttribute('fill', col);
   }
-  syncUI();
-}
 
-function setMode(m) {
-  uiState.mode = m;
-  if (uiState.enabled) {
-    if (m === 'auto') {
-      startAutoCycle();
-    } else {
-      stopAutoCycle();
-    }
-  }
-  syncUI();
-}
-
-function setManualLight(l) {
-  uiState.manualLight = l;
-  syncUI();
-}
-
-function updSlider(color, val) {
-  val = parseInt(val);
-  if (color === 'red')    uiState.redDuration    = val;
-  if (color === 'yellow') uiState.yellowDuration = val;
-  if (color === 'green')  uiState.greenDuration  = val;
-  const key = 'val' + color.charAt(0).toUpperCase() + color.slice(1);
-  document.getElementById(key).textContent = val;
-
-  // If auto is running, the next phase change will pick up new durations.
-  // Also restart phase bar with new duration if current phase matches.
-  if (uiState.mode === 'auto' && uiState.enabled) {
-    const cur = CYCLE_ORDER[cycleIdx];
-    if (cur === color) {
-      // Restart phase bar with new duration but keep elapsed time
-      // (so the bar doesn't jump — it just recalculates remaining)
-    }
-  }
-}
-
-// ═════════════════════════════════════════════════════════
-//  AUTO CYCLE  (dashboard-local cycle for preview;
-//               ESP32 runs its own cycle independently)
-// ═════════════════════════════════════════════════════════
-let phaseStartTs = 0;
-
-function startAutoCycle() {
-  stopAutoCycle(); // clear any existing
-  cycleIdx     = 0; // always start from green
-  phaseStartTs = Date.now();
-  uiState.currentLight = CYCLE_ORDER[cycleIdx];
-  syncUI();
-  runPhase();
-}
-
-function runPhase() {
-  const light    = CYCLE_ORDER[cycleIdx];
-  const durMs    = getPhaseDuration(light) * 1000;
-  phaseStartTs   = Date.now();
-  uiState.currentLight = light;
-  syncUI();
-  addLog(light, `Auto: ${light.toUpperCase()} phase`);
-  animatePhaseBar(light, durMs);
-
-  cycleTimer = setTimeout(() => {
-    if (!uiState.enabled || uiState.mode !== 'auto') return;
-    cycleIdx = (cycleIdx + 1) % CYCLE_ORDER.length;
-    runPhase();
-  }, durMs);
-}
-
-function stopAutoCycle() {
-  if (cycleTimer) { clearTimeout(cycleTimer); cycleTimer = null; }
-  if (phaseBarRaf) { cancelAnimationFrame(phaseBarRaf); phaseBarRaf = null; }
-  document.getElementById('phaseBar').style.width = '0%';
-  document.getElementById('phaseCountdown').textContent = '--s';
-}
-
-function getPhaseDuration(light) {
-  if (light === 'red')    return uiState.redDuration;
-  if (light === 'yellow') return uiState.yellowDuration;
-  if (light === 'green')  return uiState.greenDuration;
-  return 30;
-}
-
-function animatePhaseBar(light, durMs) {
-  if (phaseBarRaf) cancelAnimationFrame(phaseBarRaf);
-  const bar = document.getElementById('phaseBar');
-  bar.className = 'phase-bar-fill ' + light;
-  document.getElementById('phaseInfo').textContent = (light + ' phase').toUpperCase();
-
-  const start = Date.now();
-  function tick() {
-    const elapsed = Date.now() - start;
-    const pct     = Math.min(100, (elapsed / durMs) * 100);
-    bar.style.width = pct + '%';
-    const rem = Math.max(0, Math.ceil((durMs - elapsed) / 1000));
-    document.getElementById('phaseCountdown').textContent = rem + 's';
-    if (pct < 100 && uiState.enabled && uiState.mode === 'auto') {
-      phaseBarRaf = requestAnimationFrame(tick);
-    }
-  }
-  tick();
-}
-
-// ═════════════════════════════════════════════════════════
-//  SYNC UI
-// ═════════════════════════════════════════════════════════
-function syncUI() {
-  // Master switch
-  document.getElementById('masterSwitch').checked = uiState.enabled;
-
-  // Mode buttons
-  document.getElementById('btnAuto').classList.toggle('active',   uiState.mode === 'auto');
-  document.getElementById('btnManual').classList.toggle('active', uiState.mode === 'manual');
-
-  // Panels
-  document.getElementById('manualSection').style.display = uiState.mode === 'manual' ? 'block' : 'none';
-  document.getElementById('autoSection').style.display   = uiState.mode === 'auto'   ? 'block' : 'none';
-
-  // Manual light button highlight
-  ['red','yellow','green','off'].forEach(l => {
-    const b = document.querySelector('.btn-' + l);
-    if (b) b.classList.toggle('active', uiState.manualLight === l && uiState.mode === 'manual');
-  });
-
-  // Determine displayed light
-  let displayLight;
-  if (!uiState.enabled) {
-    displayLight = 'off';
-  } else if (uiState.mode === 'manual') {
-    displayLight = uiState.manualLight;
+  const pn = document.getElementById('phaseName');
+  const pr = document.getElementById('phaseRem');
+  const bf = document.getElementById('barFill');
+  if (!S.enabled || dLight === 'off') {
+    pn.textContent = 'IDLE'; pn.style.color = 'var(--muted)';
+    pr.textContent = '—'; bf.style.width = '0%'; bf.style.background = 'var(--muted)';
   } else {
-    displayLight = uiState.currentLight || 'off';
+    const phase = dLight === 'red' ? 'STOP' : dLight === 'prep' ? 'READY' : dLight === 'yellow' ? 'SLOW' : 'GO';
+    const col   = (dLight === 'red' || dLight === 'prep') ? 'var(--red)' :
+                  dLight === 'yellow' ? 'var(--yellow)' : 'var(--green)';
+    pn.textContent = phase; pn.style.color = col;
+    pr.textContent = rem + 's remaining';
+    const pct = dur > 0 ? Math.max(0, Math.min(100, (rem / dur) * 100)) : 0;
+    bf.style.width = pct + '%'; bf.style.background = col;
   }
 
-  setLightDisplay(displayLight);
-
-  // Sliders
-  document.getElementById('slRed').value    = uiState.redDuration;
-  document.getElementById('slYellow').value = uiState.yellowDuration;
-  document.getElementById('slGreen').value  = uiState.greenDuration;
-  document.getElementById('valRed').textContent    = uiState.redDuration;
-  document.getElementById('valYellow').textContent = uiState.yellowDuration;
-  document.getElementById('valGreen').textContent  = uiState.greenDuration;
-
-  document.getElementById('infoMode').textContent = uiState.mode.toUpperCase();
-
-  // If system is off, clear phase bar
-  if (!uiState.enabled) {
-    document.getElementById('phaseBar').style.width = '0%';
-    document.getElementById('phaseCountdown').textContent = '--s';
-    document.getElementById('phaseInfo').textContent = 'Phase';
-  }
+  roadLightState = dLight;
 }
 
-function setLightDisplay(light) {
-  ledRed.className    = 'led-bulb' + (light === 'red'    ? ' active-red'    : '');
-  ledYellow.className = 'led-bulb' + (light === 'yellow' ? ' active-yellow' : '');
-  ledGreen.className  = 'led-bulb' + (light === 'green'  ? ' active-green'  : '');
-
-  const labels = { red:'● RED', yellow:'● YELLOW', green:'● GREEN', off:'● OFF' };
-  const colors  = { red:'var(--red)', yellow:'var(--yellow)', green:'var(--green)', off:'var(--dim)' };
-  const lbl = document.getElementById('lightLabel');
-  lbl.textContent = labels[light] || '● OFF';
-  lbl.style.color  = colors[light] || 'var(--dim)';
+// ══════════════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════════════
+function setDBPill(st) {
+  if (st === dbStatus) return; dbStatus = st;
+  const pill = document.getElementById('dbPill');
+  const txt  = document.getElementById('dbText');
+  pill.className = 'pill' + (st === 'ok' ? ' ok' : st === 'err' ? ' err' : ' loading');
+  txt.textContent = st === 'ok' ? 'DB OK' : st === 'err' ? 'DB ERR' : 'DB…';
+  if (st === 'ok')  addLog('green', 'Database connected');
+  if (st === 'err') addLog('off', 'Database connection error');
 }
 
-// ═════════════════════════════════════════════════════════
-//  LOG
-// ═════════════════════════════════════════════════════════
-function addLog(light, msg) {
+function addLog(color, msg) {
   const list = document.getElementById('logList');
-  const li   = document.createElement('li');
-  const time = new Date().toLocaleTimeString();
-  li.innerHTML = `<span class="log-dot ${light}"></span><span>${msg}</span><span class="log-time">${time}</span>`;
+  const li   = document.createElement('li'); li.className = 'log-item';
+  const safe = ['red','yellow','green','off','info','serial','warn'].includes(color) ? color : 'info';
+  li.innerHTML = `<div class="log-pip ${safe}"></div><div class="log-msg">${msg}</div><div class="log-ts">${new Date().toLocaleTimeString()}</div>`;
   list.insertBefore(li, list.firstChild);
-  while (list.children.length > 30) list.removeChild(list.lastChild);
+  while (list.children.length > 60) list.removeChild(list.lastChild);
+}
+function showBanner(m) { const b = document.getElementById('errBanner'); b.textContent = '⚠ ' + m; b.classList.add('show'); }
+function hideBanner()  { document.getElementById('errBanner').classList.remove('show'); }
+
+// ══════════════════════════════════════════════════════════
+// SERIAL PORT
+// ══════════════════════════════════════════════════════════
+function openSerialModal()  { document.getElementById('serialOverlay').classList.add('open'); }
+function closeSerialModal() { document.getElementById('serialOverlay').classList.remove('open'); }
+function showSerialErr(m)   { const b = document.getElementById('serialErr'); b.textContent = '⚠ ' + m; b.classList.add('show'); }
+
+async function connectSerial() {
+  if (!('serial' in navigator)) { showSerialErr('Web Serial not supported. Use Chrome/Edge desktop.'); return; }
+  document.getElementById('serialErr').classList.remove('show');
+  try {
+    serialPort = await navigator.serial.requestPort();
+    const baud = parseInt(document.getElementById('baudSelect').value);
+    await serialPort.open({ baudRate: baud });
+    serialConnected = true; updateSerialUI();
+    sLog(`Connected @ ${baud} baud`); addLog('serial', `Serial connected @ ${baud}`);
+    readSerialLoop();
+  } catch(e) { if (e.name !== 'NotFoundError') showSerialErr(e.message); }
 }
 
-// ═════════════════════════════════════════════════════════
-//  CONNECTION STATUS
-// ═════════════════════════════════════════════════════════
-function setConnected(ok) {
-  const badge = document.getElementById('connBadge');
-  badge.classList.toggle('connected', ok);
-  document.getElementById('connText').textContent = ok ? 'CONNECTED' : 'DISCONNECTED';
-  if (ok) addLog('green', 'Supabase connected');
+async function disconnectSerial() {
+  serialConnected = false;
+  try { if (serialReader) await serialReader.cancel(); } catch(e) {} serialReader = null;
+  try { if (serialPort) await serialPort.close(); } catch(e) {} serialPort = null;
+  updateSerialUI(); sLog('Disconnected'); addLog('serial', 'Serial disconnected');
 }
 
-// ═════════════════════════════════════════════════════════
-//  CONFIG MODAL
-// ═════════════════════════════════════════════════════════
-function openConfig()  { document.getElementById('cfgModal').classList.add('open'); }
-function closeConfig() { document.getElementById('cfgModal').classList.remove('open'); }
-
-function applyConfig() {
-  SUPA_URL  = document.getElementById('cfgUrl').value.trim();
-  SUPA_KEY  = document.getElementById('cfgKey').value.trim();
-  DEVICE_ID = document.getElementById('cfgDevice').value.trim() || 'ESP32_TL_001';
-  localStorage.setItem('sb_url',    SUPA_URL);
-  localStorage.setItem('sb_key',    SUPA_KEY);
-  localStorage.setItem('sb_device', DEVICE_ID);
-  closeConfig();
-  initSupabase();
-}
-
-// ═════════════════════════════════════════════════════════
-//  ROAD ANIMATION
-// ═════════════════════════════════════════════════════════
-const canvas = document.getElementById('road');
-const ctx    = canvas.getContext('2d');
-
-// ── Road geometry constants (set in resize, used everywhere) ──
-let W = 0, H = 0, HY = 0, VX = 0;
-const ROAD_W = 64;
-
-// ── Cars ──────────────────────────────────────────────────
-const CAR_COLORS = ['#3a7bd5','#e84393','#ff6b35','#00c9ff','#c0392b',
-                    '#27ae60','#8e44ad','#f39c12','#16a085','#2980b9'];
-
-const cars = [];
-
-/**
- * dir: 'right' | 'left' | 'down' | 'up'
- * Each car stays in its own lane (fixed Y for horizontal, fixed X for vertical).
- */
-function makeCar(dir) {
-  const color = CAR_COLORS[Math.floor(Math.random() * CAR_COLORS.length)];
-  const speed = 0.6 + Math.random() * 1.1;
-  let x, y, laneOffset;
-
-  // Lanes are offset from road center
-  // Horizontal road at HY: right-going cars in top half, left-going in bottom half
-  // Vertical road at VX:   down-going cars in left half, up-going in right half
-  switch (dir) {
-    case 'right':
-      laneOffset = -16;
-      x = Math.random() * W;
-      y = HY + laneOffset;
-      break;
-    case 'left':
-      laneOffset = 16;
-      x = Math.random() * W;
-      y = HY + laneOffset;
-      break;
-    case 'down':
-      laneOffset = -16;
-      x = VX + laneOffset;
-      y = Math.random() * H;
-      break;
-    case 'up':
-      laneOffset = 16;
-      x = VX + laneOffset;
-      y = Math.random() * H;
-      break;
-  }
-
-  return { x, y, dir, speed, color, w: 22, h: 12, laneOffset, stopped: false };
-}
-
-function initCars() {
-  cars.length = 0;
-  // 4 directions × ~3 cars each
-  ['right','left','down','up'].forEach(dir => {
-    for (let i = 0; i < 3; i++) cars.push(makeCar(dir));
-  });
-}
-
-// ── Stop logic ───────────────────────────────────────────
-/**
- * A car approaching the intersection stops when:
- *  - The light is red OR yellow
- *  - It hasn't crossed the stop line yet
- *
- * Stop line positions:
- *  - rightward cars: stop at x = VX - ROAD_W/2 - 5
- *  - leftward cars:  stop at x = VX + ROAD_W/2 + 5
- *  - downward cars:  stop at y = HY - ROAD_W/2 - 5
- *  - upward cars:    stop at y = HY + ROAD_W/2 + 5
- */
-function shouldCarStop(car) {
-  const light = getDisplayLight();
-  if (light !== 'red' && light !== 'yellow') return false;
-
-  const STOP_MARGIN = 8; // px before stop line
-
-  switch (car.dir) {
-    case 'right': {
-      const stopX = VX - ROAD_W / 2 - STOP_MARGIN;
-      // approaching = x is before stop line (from left)
-      return car.x < stopX && car.x > stopX - 200;
-    }
-    case 'left': {
-      const stopX = VX + ROAD_W / 2 + STOP_MARGIN;
-      return car.x > stopX && car.x < stopX + 200;
-    }
-    case 'down': {
-      const stopY = HY - ROAD_W / 2 - STOP_MARGIN;
-      return car.y < stopY && car.y > stopY - 200;
-    }
-    case 'up': {
-      const stopY = HY + ROAD_W / 2 + STOP_MARGIN;
-      return car.y > stopY && car.y < stopY + 200;
-    }
-  }
-  return false;
-}
-
-function getDisplayLight() {
-  if (!uiState.enabled) return 'off';
-  if (uiState.mode === 'manual') return uiState.manualLight;
-  return uiState.currentLight || 'off';
-}
-
-// ── Main animation loop ──────────────────────────────────
-function startRoadAnimation() {
-  function resize() {
-    const scene = canvas.parentElement;
-    W = canvas.width  = scene.clientWidth;
-    H = canvas.height = scene.clientHeight;
-    HY = H * 0.55;
-    VX = W * 0.45;
-    initCars();
-  }
-  window.addEventListener('resize', resize);
-  resize();
-
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-
-    // Sky
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, '#080d1a');
-    sky.addColorStop(1, '#0c1428');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-
-    // Stars
-    ctx.fillStyle = '#ffffff18';
-    for (let s = 0; s < 60; s++) {
-      ctx.fillRect((s * 137.5) % W, (s * 79.3) % (H * 0.6), 1, 1);
-    }
-
-    // ── Roads ──
-    ctx.fillStyle = '#1c2030';
-    ctx.fillRect(0, HY - ROAD_W / 2, W, ROAD_W);         // horizontal
-    ctx.fillRect(VX - ROAD_W / 2, 0, ROAD_W, H);         // vertical
-    ctx.fillStyle = '#1a1d2c';
-    ctx.fillRect(VX - ROAD_W / 2, HY - ROAD_W / 2, ROAD_W, ROAD_W); // intersection
-
-    // Kerb lines
-    ctx.strokeStyle = '#ffffff12';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0, HY - ROAD_W / 2, W, ROAD_W);
-    ctx.strokeRect(VX - ROAD_W / 2, 0, ROAD_W, H);
-
-    // Center dashes
-    ctx.setLineDash([18, 14]);
-    ctx.strokeStyle = '#ffffff22';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, HY);                      ctx.lineTo(VX - ROAD_W / 2, HY);
-    ctx.moveTo(VX + ROAD_W / 2, HY);       ctx.lineTo(W, HY);
-    ctx.moveTo(VX, 0);                      ctx.lineTo(VX, HY - ROAD_W / 2);
-    ctx.moveTo(VX, HY + ROAD_W / 2);       ctx.lineTo(VX, H);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Zebra crossings
-    for (let z = 0; z < 5; z++) {
-      ctx.fillStyle = '#ffffff09';
-      ctx.fillRect(VX + ROAD_W / 2 + 8 + z * 10, HY - ROAD_W / 2, 6, ROAD_W);
-      ctx.fillRect(VX - ROAD_W / 2, HY + ROAD_W / 2 + 8 + z * 10, ROAD_W, 6);
-    }
-
-    // Buildings
-    drawBuildings();
-
-    // ── Traffic light pole ──
-    const tlx = VX + ROAD_W / 2 + 10;
-    const tly = HY - ROAD_W / 2 - 64;
-    const light = getDisplayLight();
-
-    ctx.strokeStyle = '#3a4a66';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(tlx, HY - ROAD_W / 2);
-    ctx.lineTo(tlx, tly + 10);
-    ctx.stroke();
-
-    // Housing
-    ctx.fillStyle = '#0a0c14';
-    ctx.strokeStyle = '#2a3550';
-    ctx.lineWidth = 1.5;
-    roundRect(ctx, tlx - 9, tly, 18, 48, 4);
-    ctx.fill(); ctx.stroke();
-
-    const lGlow = { red: '#ff3b3b', yellow: '#ffd700', green: '#00e87a' };
-    ['red', 'yellow', 'green'].forEach((l, i) => {
-      const cy = tly + 8 + i * 14;
-      const isOn = l === light;
-      ctx.beginPath();
-      ctx.arc(tlx, cy, 5, 0, Math.PI * 2);
-      if (isOn) {
-        ctx.shadowColor = lGlow[l];
-        ctx.shadowBlur  = 14;
+async function readSerialLoop() {
+  const dec = new TextDecoderStream();
+  serialPort.readable.pipeTo(dec.writable);
+  serialReader = dec.readable.getReader();
+  try {
+    while (serialConnected) {
+      const { value, done } = await serialReader.read();
+      if (done) break;
+      serialBuffer += value;
+      let idx;
+      while ((idx = serialBuffer.indexOf('\n')) >= 0) {
+        const line = serialBuffer.slice(0, idx).trim();
+        serialBuffer = serialBuffer.slice(idx + 1);
+        if (line) processSerialLine(line);
       }
-      ctx.fillStyle = isOn ? lGlow[l] : '#1a2035';
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    });
-
-    // Glow halo on road when light is on
-    if (light !== 'off') {
-      const grd = ctx.createRadialGradient(tlx, tly + 24, 0, tlx, tly + 24, 60);
-      grd.addColorStop(0, lGlow[light] + '33');
-      grd.addColorStop(1, 'transparent');
-      ctx.fillStyle = grd;
-      ctx.fillRect(tlx - 65, tly - 10, 130, 90);
     }
+  } catch(e) { if (serialConnected) { sLog('Read error: ' + e.message); disconnectSerial(); } }
+}
 
-    // ── Cars ──
-    cars.forEach(car => {
-      car.stopped = shouldCarStop(car);
+function processSerialLine(line) {
+  sLog(line);
+  const tm = line.match(/\[TICK\]\s+light=(\w+)\s+remaining=(\d+)/i);
+  if (tm) {
+    const l = tm[1].toLowerCase();
+    const t = parseInt(tm[2]);
+    if (['red','prep','yellow','green','off'].includes(l)) {
+      S.enabled = true;
+      S.currentLight = l;
+      S.remainingTime = t;
+      lastDBLight = l;
+      render();
+    }
+  }
+  const lm = line.match(/\[LIGHT\].*→\s*(\w+)/i);
+  if (lm) addLog('serial', `ESP32 → ${lm[1].toUpperCase()}`);
+}
 
-      if (!car.stopped) {
-        switch (car.dir) {
-          case 'right': car.x += car.speed; if (car.x > W + 30) car.x = -30; break;
-          case 'left':  car.x -= car.speed; if (car.x < -30)    car.x = W + 30; break;
-          case 'down':  car.y += car.speed; if (car.y > H + 30) car.y = -30; break;
-          case 'up':    car.y -= car.speed; if (car.y < -30)    car.y = H + 30; break;
+async function sendSerial(cmd) {
+  if (!serialConnected || !serialPort) return;
+  try {
+    const enc = new TextEncoderStream();
+    enc.readable.pipeTo(serialPort.writable);
+    const w = enc.writable.getWriter();
+    await w.write(cmd + '\n'); await w.close();
+    sLog('TX: ' + cmd);
+  } catch(e) {}
+}
+
+function sLog(msg) {
+  const el = document.getElementById('serialLog');
+  el.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+  el.scrollTop = el.scrollHeight;
+  const lines = el.textContent.split('\n');
+  if (lines.length > 150) el.textContent = lines.slice(-120).join('\n');
+}
+
+function updateSerialUI() {
+  const pill = document.getElementById('serialPill'), pt = document.getElementById('serialText');
+  const chip = document.getElementById('serialChip');
+  const cBtn = document.getElementById('serialConnBtn'), dBtn = document.getElementById('serialDiscBtn');
+  if (serialConnected) {
+    pill.className = 'pill serial-pill connected'; pt.textContent = 'SERIAL ✓';
+    chip.textContent = 'CONNECTED'; chip.className = 'badge b-serial';
+    cBtn.style.display = 'none'; dBtn.style.display = 'block';
+  } else {
+    pill.className = 'pill serial-pill'; pt.textContent = 'SERIAL';
+    chip.textContent = 'DISCONNECTED'; chip.className = 'badge b-off';
+    cBtn.style.display = 'block'; dBtn.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// ROAD CANVAS
+// ══════════════════════════════════════════════════════════
+let canvas, ctx, roadLightState = 'off';
+const CAR_COLORS = ['#ef4444','#3b82f6','#eab308','#22c55e','#a855f7','#f97316','#06b6d4','#ec4899','#14b8a6','#f59e0b'];
+let cars = [], ducks = [];
+
+// Cloud data for animation
+let clouds = [
+  { x: 0.15, y: 0.12, size: 35, speed: 0.0002 },
+  { x: 0.75, y: 0.08, size: 45, speed: 0.0003 },
+  { x: 0.45, y: 0.15, size: 30, speed: 0.00025 },
+  { x: 0.25, y: -0.15, size: 40, speed: 0.00015 },
+  { x: 0.12, y: -0.12, size: 35, speed: 0.0002 },
+  { x: 0.38, y: -0.14, size: 32, speed: 0.00018 }
+];
+let lastLightState = 'off';
+let ducksCrossing = false;
+let vehiclesMoving = false;
+let vehiclesPreparing = false;
+
+// ── geometry helper ──────────────────────────────────────
+// All measurements derived here so every part of the code
+// references the SAME numbers.
+function geo() {
+  const W = canvas.width, H = canvas.height, cy = H / 2;
+  const halfRoad    = Math.min(100, H * 0.15);
+  const laneW       = halfRoad / 2;          // width of one lane
+  // Pedestrian crossing: centred at W/2
+  const crossW      = 48;                    // total crossing width in px
+  const crossLeft   = W / 2 - crossW / 2;
+  const crossRight  = W / 2 + crossW / 2;
+  // Stop line: just outside the crossing edges + small gap
+  const stopGap     = 12;
+  const stopLeft    = crossLeft  - stopGap;  // left-traffic stops here (moving →)
+  const stopRight   = crossRight + stopGap;  // right-traffic stops here (moving ←)
+  return {
+    W, H, cy, halfRoad, laneW,
+    crossW, crossLeft, crossRight,
+    stopLeft, stopRight,
+    // lane centre-Y positions
+    loY: cy + laneW * 1.5,   // left outer  (motorcycles  →)
+    liY: cy + laneW * 0.5,   // left inner  (cars         →)
+    riY: cy - laneW * 0.5,   // right inner (cars         ←)
+    roY: cy - laneW * 1.5,   // right outer (motorcycles  ←)
+    roadTop:    cy - halfRoad,
+    roadBottom: cy + halfRoad
+  };
+}
+
+function spawnAll() {
+  if (!canvas.width) return;
+  const g = geo();
+  cars = [];
+  // Cars in right-bound inner lane (li) - 5 cars with different vibrant colors
+  for (let i = 0; i < 5; i++)
+    cars.push({ type:'car',        lane:'li', x:-90  - i*280, y:0, w:78, h:32, color:CAR_COLORS[i%10],     speed:1.9+i*0.12, stopped:false });
+  // Motorcycles in right-bound outer lane (lo) - 3 motorcycles with vibrant colors
+  for (let i = 0; i < 3; i++)
+    cars.push({ type:'motorcycle', lane:'lo', x:-45  - i*350, y:0, w:42, h:18, color:CAR_COLORS[(i+5)%10], speed:2.6+i*0.15,  stopped:false });
+
+  spawnDucks(g);
+}
+
+// ── duck data ────────────────────────────────────────────
+// Each duck column is a separate entity; the 8 ducks in a
+// column are staggered vertically so they look like a line.
+// Movement: they walk DOWN the crossing (top → bottom of road).
+// When the light is RED / PREP → walk.  Otherwise → wait just
+// above the road top edge.
+const DUCK_SPEED      = 0.75;   // px per frame while crossing (faster for safe crossing)
+const DUCK_WAIT_Y_TOP = -30;    // y when waiting above road (head of column)
+
+function spawnDucks(g) {
+  ducks = [];
+  const cols  = 3;
+  const gap   = 14;                          // horizontal gap between columns
+  const colXs = [
+    g.W / 2 - gap,
+    g.W / 2,
+    g.W / 2 + gap
+  ];
+  for (let col = 0; col < cols; col++) {
+    for (let row = 0; row < 8; row++) {
+      ducks.push({
+        col,
+        row,
+        x:     colXs[col],
+        // stagger rows above the road; row 0 = lead duck
+        y:     DUCK_WAIT_Y_TOP - row * 18,
+        baseX: colXs[col],
+        state: 'waiting'   // 'waiting' | 'crossing' | 'gone'
+      });
+    }
+  }
+}
+
+// ── leader / following logic for vehicles ───────────────
+// IMPORTANT: only look within the EXACT same lane to avoid
+// cross-lane phantom blocking between li↔lo or ri↔ro.
+function leaderCar(car) {
+  const rightward = car.lane === 'li' || car.lane === 'lo';
+  if (rightward) {
+    // Closest vehicle ahead in the same lane with a larger x
+    const ahead = cars.filter(c => c !== car && c.lane === car.lane && c.x > car.x);
+    return ahead.length ? ahead.reduce((a,b) => a.x < b.x ? a : b) : null;
+  } else {
+    // Closest vehicle ahead in the same lane with a smaller x
+    const ahead = cars.filter(c => c !== car && c.lane === car.lane && c.x < car.x);
+    return ahead.length ? ahead.reduce((a,b) => a.x > b.x ? a : b) : null;
+  }
+}
+
+function tooClose(car, ldr) {
+  if (!ldr) return false;
+  const minGap = car.type === 'motorcycle' ? 18 : 32;
+  const hyst   = car.stopped ? 8 : 0;
+  const rightward = car.lane === 'li' || car.lane === 'lo';
+  if (rightward) {
+    // Right-bound: gap = space between car's front (right edge) and leader's back (left edge)
+    return (ldr.x - (car.x + car.w)) < (minGap + hyst);
+  } else {
+    // Left-bound:  gap = space between car's front (left edge) and leader's back (right edge)
+    // car.x is the front for left-movers; ldr.x+ldr.w is leader's rear
+    return (car.x - (ldr.x + ldr.w)) < (minGap + hyst);
+  }
+}
+
+// ── MAIN DRAW LOOP ───────────────────────────────────────
+function drawFrame() {
+  const g = geo();
+  const { W, H, cy, halfRoad, laneW,
+          crossW, crossLeft, crossRight,
+          stopLeft, stopRight,
+          loY, liY, riY, roY,
+          roadTop, roadBottom } = g;
+
+  if (!W || !H) { requestAnimationFrame(drawFrame); return; }
+
+  // ── Background ──────────────────────────────────────────
+  // Sky gradient
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+  skyGrad.addColorStop(0, '#60a5fa');
+  skyGrad.addColorStop(0.5, '#93c5fd');
+  skyGrad.addColorStop(1, '#dbeafe');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Clouds in the sky - animated drifting
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  clouds.forEach(cloud => {
+    // Update cloud position (drift to the right)
+    cloud.x += cloud.speed;
+    // Wrap around when cloud goes off screen
+    if (cloud.x > 1.2) cloud.x = -0.2;
+    // Draw cloud at current position
+    const cloudX = cloud.x * W;
+    const cloudY = cloud.y > 0 ? cloud.y * H : roadTop + cloud.y * 100;
+    drawCloud(cloudX, cloudY, cloud.size);
+  });
+
+  // Grass above & below road with gradient
+  const grassGradTop = ctx.createLinearGradient(0, 0, 0, roadTop);
+  grassGradTop.addColorStop(0, '#16a34a');
+  grassGradTop.addColorStop(1, '#22c55e');
+  ctx.fillStyle = grassGradTop;
+  ctx.fillRect(0, 0, W, roadTop);
+
+  const grassGradBottom = ctx.createLinearGradient(0, roadBottom, 0, H);
+  grassGradBottom.addColorStop(0, '#22c55e');
+  grassGradBottom.addColorStop(1, '#16a34a');
+  ctx.fillStyle = grassGradBottom;
+  ctx.fillRect(0, roadBottom, W, H - roadBottom);
+
+  // Decorative trees on grass
+  drawTree(W * 0.08, roadTop - 25, 0.8);
+  drawTree(W * 0.22, roadTop - 35, 1);
+  drawTree(W * 0.85, roadTop - 30, 0.9);
+  drawTree(W * 0.92, roadBottom + 15, 0.7);
+  drawTree(W * 0.12, roadBottom + 20, 0.85);
+
+  // Flowers on top grass (near road)
+  drawFlowerLine(W * 0.32, roadTop - 35, 8);
+  drawFlowerLine(W * 0.55, roadTop - 25, 6);
+  drawFlowerLine(W * 0.75, roadTop - 20, 7);
+  drawTree(W * 0.35, roadTop - 15, 0.6);
+
+  // Flowers on bottom grass (near road)
+  drawFlowerLine(W * 0.15, roadBottom + 15, 6);
+  drawFlowerLine(W * 0.40, roadBottom + 20, 8);
+  drawFlowerLine(W * 0.65, roadBottom + 18, 7);
+  drawFlowerLine(W * 0.88, roadBottom + 12, 6);
+
+  // Grass texture stripes
+  ctx.fillStyle = 'rgba(21,128,61,0.3)';
+  for (let i = 0; i < W; i += 60) {
+    ctx.fillRect(i, roadTop - 12, 40, 6);
+    ctx.fillRect(i + 30, roadBottom + 6, 40, 6);
+  }
+
+  // Road surface with asphalt gradient
+  const roadGrad = ctx.createLinearGradient(0, roadTop, 0, roadBottom);
+  roadGrad.addColorStop(0, '#374151');
+  roadGrad.addColorStop(0.5, '#4b5563');
+  roadGrad.addColorStop(1, '#374151');
+  ctx.fillStyle = roadGrad;
+  ctx.fillRect(0, roadTop, W, halfRoad * 2);
+
+  // Road edges with bright lines
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, roadTop);    ctx.lineTo(W, roadTop);    ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, roadBottom); ctx.lineTo(W, roadBottom); ctx.stroke();
+
+  // Lane dividers
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([20, 20]);
+  // Left inner lane divider
+  ctx.beginPath(); ctx.moveTo(0, roadTop + laneW); ctx.lineTo(W, roadTop + laneW); ctx.stroke();
+  // Right inner lane divider  
+  ctx.beginPath(); ctx.moveTo(0, roadBottom - laneW); ctx.lineTo(W, roadBottom - laneW); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Centre divider dashes - bright yellow
+  ctx.strokeStyle = '#facc15';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([15, 15]);
+  ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── Pedestrian crossing (zebra stripes — horizontal) ────
+  // White stripes run horizontally across the crossing band
+  const stripeH   = 7;
+  const stripeGap = 8;
+  ctx.fillStyle = 'rgba(255,255,255,0.82)';
+  for (let sy = roadTop; sy < roadBottom; sy += stripeH + stripeGap) {
+    const sh = Math.min(stripeH, roadBottom - sy);
+    ctx.fillRect(crossLeft, sy, crossW, sh);
+  }
+
+  // ── Stop lines ──────────────────────────────────────────
+  ctx.strokeStyle = 'rgba(255,255,255,.7)';
+  ctx.lineWidth = 4;
+  // Left stop line (right-bound traffic stops before crossing)
+  ctx.beginPath(); ctx.moveTo(stopLeft, roadTop); ctx.lineTo(stopLeft, roadBottom); ctx.stroke();
+  // Right stop line (left-bound traffic stops before crossing)
+  ctx.beginPath(); ctx.moveTo(stopRight, roadTop); ctx.lineTo(stopRight, roadBottom); ctx.stroke();
+
+  // ── Traffic light pole & box ─────────────────────────────
+  // Placed at the LEFT edge of the crossing so it never overlaps
+  // the duck queue (which queues above the centre at W/2).
+  const tlBoxW  = 30, tlBoxH = 80;
+  const tlPoleX = crossLeft - 28;          // pole base x: left of crossing
+  const tlBoxX  = tlPoleX - tlBoxW / 2;
+  const tlBoxY  = roadTop - tlBoxH - 8;
+
+  // Vertical pole
+  ctx.fillStyle = '#2c2f3a';
+  ctx.fillRect(tlPoleX - 4, roadTop, 8, -(tlBoxH + 8));
+
+  // Horizontal arm from pole top to just over the road edge
+  ctx.fillRect(tlPoleX - 4, tlBoxY, crossLeft - tlPoleX + 4, 8);
+
+  // Box
+  ctx.fillStyle = '#0a0c12';
+  rrect(tlBoxX, tlBoxY, tlBoxW, tlBoxH, 6); ctx.fill();
+  ctx.strokeStyle = '#2a2f44'; ctx.lineWidth = 1.5;
+  rrect(tlBoxX, tlBoxY, tlBoxW, tlBoxH, 6); ctx.stroke();
+
+  // Bulbs inside box
+  const bulbCX   = tlBoxX + tlBoxW / 2;
+  const bulbDefs = [
+    { color: 'red',    by: tlBoxY + 14 },
+    { color: 'yellow', by: tlBoxY + 40 },
+    { color: 'green',  by: tlBoxY + 66 }
+  ];
+  const bulbColors = { red: '#f43f5e', yellow: '#fbbf24', green: '#22c55e' };
+  bulbDefs.forEach(b => {
+    const on = (roadLightState === b.color);
+    ctx.beginPath(); ctx.arc(bulbCX, b.by, 7, 0, Math.PI * 2);
+    if (on) {
+      ctx.fillStyle   = bulbColors[b.color];
+      ctx.shadowColor = bulbColors[b.color];
+      ctx.shadowBlur  = 18;
+    } else {
+      ctx.fillStyle  = '#0b0d16';
+      ctx.shadowBlur = 0;
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = on ? bulbColors[b.color] : '#1c2038';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // ── Vehicles ─────────────────────────────────────────────
+  const lightStopped = (roadLightState === 'red' || roadLightState === 'prep' || roadLightState === 'yellow');
+
+  cars.forEach(car => {
+    // Assign y from lane
+    if (car.lane === 'li') car.y = liY - car.h / 2;
+    if (car.lane === 'ri') car.y = riY - car.h / 2;
+    if (car.lane === 'lo') car.y = loY - car.h / 2;
+    if (car.lane === 'ro') car.y = roY - car.h / 2;
+
+    const rightward = car.lane === 'li' || car.lane === 'lo';
+
+    // Should this vehicle stop at the stop line?
+    // Add safety buffer to prevent vehicles from entering pedestrian crossing
+    const safetyBuffer = 30; // Extra space before crossing
+    
+    // Predictive stopping logic for yellow light
+    let shouldStop = lightStopped;
+    if (roadLightState === 'yellow') {
+      // Check if vehicle has already passed the crossing barrier
+      const hasPassedCrossing = rightward 
+        ? car.x > (crossRight + safetyBuffer)  // Right-moving: past right edge of crossing
+        : (car.x + car.w) < (crossLeft - safetyBuffer);  // Left-moving: past left edge of crossing
+      
+      if (hasPassedCrossing) {
+        // Already past the crossing - continue moving, don't stop
+        shouldStop = false;
+        addLog('green', '🚗 Vehicle continuing through (already past crossing)');
+      } else {
+        // Calculate if vehicle can stop safely before crossing
+        const distanceToStop = rightward 
+          ? (stopLeft - safetyBuffer) - (car.x + car.w)
+          : car.x - (stopRight + safetyBuffer);
+        
+        // Estimate stopping distance based on current speed
+        const stoppingDistance = car.speed * 15; // Frames needed to stop
+        
+        if (distanceToStop > stoppingDistance) {
+          // Can stop safely - do it
+          shouldStop = true;
+          addLog('yellow', '🚗 Vehicle slowing down for yellow light');
+        } else if (distanceToStop > 0) {
+          // Too close to stop safely - continue through slowly
+          car.speed *= 0.5; // Slow down but don't stop
+          shouldStop = false;
+          addLog('yellow', '🚗 Vehicle continuing through crossing (too close to stop)');
         }
       }
+    }
+    
+    if (shouldStop) {
+      if (rightward  && (car.x + car.w) >= (stopLeft - safetyBuffer))  car.stopped = true;
+      if (!rightward && car.x <= (stopRight + safetyBuffer))            car.stopped = true;
+    } else {
+      car.stopped = false;
+    }
 
-      // Keep car on its lane (clamp Y for horizontal, X for vertical)
-      if (car.dir === 'right' || car.dir === 'left') {
-        car.y = HY + car.laneOffset;
-      } else {
-        car.x = VX + car.laneOffset;
-      }
+    const leader = leaderCar(car);
+    if (!car.stopped && !tooClose(car, leader)) {
+      if (rightward)  car.x += car.speed;
+      else            car.x -= car.speed;
+    }
 
-      drawCar(car);
-    });
+    // Respawn off-screen
+    if (car.x >  W + 150) car.x = -200;
+    if (car.x < -200)     car.x =  W + 150;
 
-    requestAnimationFrame(draw);
+    // Draw
+    if (car.type === 'motorcycle') drawMotorcycle(car);
+    else                           drawCar(car);
+  });
+
+  // ── Ducks ────────────────────────────────────────────────
+  // Logic: ducks are visible and waiting during YELLOW/ORANGE light
+  //        They cross during RED light
+  //        They hide during GREEN light (already crossed to other side)
+  const ducksMayWalk = (roadLightState === 'red');
+  const ducksVisible = (roadLightState === 'red' || roadLightState === 'yellow' || roadLightState === 'prep');
+  
+  // Check for state changes and log them
+  if (roadLightState !== lastLightState) {
+    // Light state changed
+    if (roadLightState === 'green') {
+      addLog('green', '🚦 GREEN light - Vehicles moving, ducks waiting');
+      vehiclesMoving = true;
+      vehiclesPreparing = false;
+      ducksCrossing = false;
+    } else if (roadLightState === 'yellow') {
+      addLog('yellow', '🚦 YELLOW light - Vehicles preparing to stop');
+      vehiclesMoving = false;
+      vehiclesPreparing = true;
+      ducksCrossing = false;
+    } else if (roadLightState === 'red') {
+      addLog('red', '🚦 RED light - Ducks crossing, vehicles stopped');
+      vehiclesMoving = false;
+      vehiclesPreparing = false;
+      ducksCrossing = true;
+    } else if (roadLightState === 'off') {
+      addLog('off', '🚦 System OFF');
+      vehiclesMoving = false;
+      vehiclesPreparing = false;
+      ducksCrossing = false;
+    }
+    lastLightState = roadLightState;
   }
-  draw();
+  
+  // Check duck crossing activity
+  const currentlyCrossing = ducks.some(d => d.state === 'crossing');
+  if (currentlyCrossing && !ducksCrossing) {
+    addLog('green', '🦆 Ducks crossing pedestrian lane');
+    ducksCrossing = true;
+  } else if (!currentlyCrossing && ducksCrossing) {
+    addLog('info', '🦆 Ducks finished crossing');
+    ducksCrossing = false;
+  }
+
+  // Waiting ducks stack visibly just above the road top, row 0 = closest to road
+  const duckRowSpacing = 18;
+  const duckQueueBase  = roadTop - 14;  // row 0 waits just above the road edge
+
+  ducks.forEach(d => {
+    if (d.state === 'waiting') {
+      // Pin position to queue above road so they're always visible
+      d.y = duckQueueBase - d.row * duckRowSpacing;
+
+      // Start crossing immediately when light is red (lead ducks first)
+      if (ducksMayWalk && d.row === 0) {
+        d.state = 'crossing';
+      } else if (ducksMayWalk && d.row > 0) {
+        // Follow the duck ahead
+        const ahead = ducks.find(o => o.col === d.col && o.row === d.row - 1);
+        if (ahead && ahead.state === 'crossing' && (ahead.y - d.y) > duckRowSpacing * 0.8) {
+          d.state = 'crossing';
+        }
+      }
+    }
+
+    if (d.state === 'crossing') {
+      if (!ducksMayWalk) {
+        // Light changed - stop and wait (rare edge case)
+        d.state = 'waiting';
+      } else {
+        d.y += DUCK_SPEED;
+        if (d.y > roadBottom + 30) {
+          d.state = 'gone';
+        }
+      }
+    }
+
+    if (d.state === 'gone') {
+      d.state = 'waiting';
+      // y will be repinned to queue position next frame
+    }
+
+    // Draw ducks only when visible (yellow, prep, or red)
+    // During green, ducks are hidden (waiting on the other side)
+    if (ducksVisible && d.y > duckQueueBase - duckRowSpacing * 10 && d.y < H + 40) {
+      drawDuck(d);
+    }
+  });
+
+  requestAnimationFrame(drawFrame);
 }
 
-function drawCar(car) {
+// ── Draw helpers ─────────────────────────────────────────
+function rrect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function drawCar(c) {
+  const { x, y, w, h, color, stopped } = c;
   ctx.save();
-  ctx.translate(car.x, car.y);
+  // Body
+  ctx.fillStyle   = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur  = stopped ? 1 : 6;
+  rrect(x, y, w, h, 5); ctx.fill();
+  ctx.shadowBlur = 0;
+  // Windscreen tint
+  ctx.fillStyle = 'rgba(160,215,255,.22)';
+  rrect(x + 5, y + 3, w - 10, h - 6, 3); ctx.fill();
+  // Headlights
+  ctx.fillStyle = 'rgba(255,255,200,.9)';
+  ctx.beginPath(); ctx.arc(x + w - 4, y + 5,   2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + w - 4, y + h - 5, 2.5, 0, Math.PI*2); ctx.fill();
+  // Tail lights
+  ctx.fillStyle = 'rgba(255,50,50,.85)';
+  ctx.beginPath(); ctx.arc(x + 4, y + 5,   2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 4, y + h - 5, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
 
-  let angle = 0;
-  if (car.dir === 'left')  angle = Math.PI;
-  if (car.dir === 'down')  angle = Math.PI / 2;
-  if (car.dir === 'up')    angle = -Math.PI / 2;
-  ctx.rotate(angle);
+function drawMotorcycle(c) {
+  const { x, y, w, h, color, stopped, lane } = c;
+  ctx.save();
+  ctx.fillStyle   = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur  = stopped ? 1 : 6;
+  ctx.beginPath();
+  ctx.ellipse(x + w/2, y + h/2, w/2, h/2.2, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  // Wheels
+  ctx.fillStyle = '#222';
+  ctx.beginPath(); ctx.arc(x + 5,     y + h/2, 4, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + w - 5, y + h/2, 4, 0, Math.PI*2); ctx.fill();
+  // Headlight (front depending on direction)
+  ctx.fillStyle = '#ffffa0';
+  const frontX = (lane === 'lo' || lane === 'li') ? x + w - 2 : x + 2;
+  ctx.beginPath(); ctx.arc(frontX, y + h/2, 2, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
 
-  const cw = car.w, ch = car.h;
+function drawDuck(d) {
+  const t = Date.now();
+  ctx.save();
+  ctx.translate(d.x, d.y);
+
+  // Waddle sway while walking
+  const walking = d.state === 'crossing';
+  const waddle  = walking ? Math.sin(t / 110 + d.col * 1.4 + d.row * 0.7) * 0.12 : 0;
+  ctx.rotate(waddle);
 
   // Body
-  ctx.fillStyle = car.color;
-  roundRect(ctx, -cw / 2, -ch / 2, cw, ch, 3);
+  ctx.fillStyle   = '#fdd835';
+  ctx.strokeStyle = '#f9a825';
+  ctx.lineWidth   = 1;
+  ctx.beginPath(); ctx.ellipse(0, 3, 8, 6, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+  // Head
+  ctx.beginPath(); ctx.arc(-1, -5, 5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+  // Eye
+  ctx.fillStyle = '#111';
+  ctx.beginPath(); ctx.arc(-2.5, -6, 1.5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-2, -6.5, 0.6, 0, Math.PI*2); ctx.fill();
+
+  // Beak (pointing left — duck facing crossing direction = downward)
+  ctx.fillStyle = '#ff9800';
+  ctx.beginPath();
+  ctx.moveTo(-6, -5);
+  ctx.lineTo(-10, -4);
+  ctx.lineTo(-6, -3);
+  ctx.closePath();
   ctx.fill();
 
-  // Roof
-  ctx.fillStyle = car.color + 'bb';
-  roundRect(ctx, -cw / 2 + 4, -ch / 2 + 2, cw - 14, ch - 4, 2);
-  ctx.fill();
+  // Wing
+  ctx.fillStyle   = '#fbc02d';
+  ctx.strokeStyle = '#f9a825';
+  ctx.beginPath(); ctx.ellipse(3, 2, 4, 2.5, 0.2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
 
-  // Windshield (front = +x direction)
-  ctx.fillStyle = '#8ac4ff55';
-  ctx.fillRect(cw / 2 - 8, -ch / 2 + 2, 5, ch - 4);
-
-  // Headlights
-  ctx.fillStyle = '#ffffaacc';
-  ctx.fillRect(cw / 2 - 2, -ch / 2 + 2, 2, 3);
-  ctx.fillRect(cw / 2 - 2, ch / 2 - 5,  2, 3);
-
-  // Taillights
-  ctx.fillStyle = '#ff444488';
-  ctx.fillRect(-cw / 2, -ch / 2 + 2, 2, 3);
-  ctx.fillRect(-cw / 2, ch / 2 - 5,  2, 3);
-
-  // Brake lights when stopped
-  if (car.stopped) {
-    ctx.fillStyle = '#ff4444dd';
-    ctx.fillRect(-cw / 2, -ch / 2 + 2, 3, 4);
-    ctx.fillRect(-cw / 2, ch / 2 - 6,  3, 4);
-  }
+  // Feet bob
+  const fb = walking ? Math.sin(t / 90 + d.col + d.row) * 2 : 0;
+  ctx.fillStyle = '#ff9800';
+  ctx.beginPath(); ctx.ellipse(-2 + fb, 9, 3, 1.5, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse( 3 - fb, 9, 3, 1.5, 0, 0, Math.PI*2); ctx.fill();
 
   ctx.restore();
 }
 
-function drawBuildings() {
-  const bldgs = [
-    { x:.05, w:.08, h:.25, c:'#111828' },
-    { x:.15, w:.06, h:.18, c:'#0e1a2e' },
-    { x:.65, w:.09, h:.22, c:'#111828' },
-    { x:.76, w:.07, h:.15, c:'#0d1624' },
-    { x:.86, w:.08, h:.28, c:'#0f1a30' },
-    { x:.93, w:.05, h:.12, c:'#0e1826' },
-  ];
-  bldgs.forEach(b => {
-    const bx = b.x * W, bw = b.w * W;
-    const bh = b.h * (HY - 20);
-    const by = HY - 32 - bh;
-    ctx.fillStyle = b.c;
-    ctx.fillRect(bx, by, bw, bh);
-    ctx.fillStyle = '#ffd70022';
-    for (let wr = 0; wr < Math.floor(bh / 14); wr++) {
-      for (let wc = 0; wc < Math.floor(bw / 10); wc++) {
-        if (Math.random() < .35) ctx.fillRect(bx + 3 + wc * 9, by + 4 + wr * 12, 5, 7);
-      }
-    }
-  });
+// ── Environment helpers ──────────────────────────────────
+function drawCloud(x, y, size) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI * 2);
+  ctx.arc(x + size * 0.5, y - size * 0.2, size * 0.7, 0, Math.PI * 2);
+  ctx.arc(x - size * 0.5, y - size * 0.1, size * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
-function roundRect(ctx, x, y, w, h, r) {
+function drawTree(x, y, scale) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  
+  // Trunk
+  ctx.fillStyle = '#78350f';
+  ctx.fillRect(-6, 0, 12, 20);
+  
+  // Tree crown - layered circles for full look
+  ctx.fillStyle = '#16a34a';
+  ctx.beginPath(); ctx.arc(0, -15, 25, 0, Math.PI * 2); ctx.fill();
+  
+  ctx.fillStyle = '#22c55e';
+  ctx.beginPath(); ctx.arc(-10, -20, 18, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(10, -18, 16, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -28, 20, 0, Math.PI * 2); ctx.fill();
+  
+  // Highlight
+  ctx.fillStyle = '#4ade80';
+  ctx.beginPath(); ctx.arc(-5, -25, 8, 0, Math.PI * 2); ctx.fill();
+  
+  ctx.restore();
+}
+
+function drawMountain(x, y, height) {
+  ctx.save();
+  ctx.translate(x, y);
+  
+  // Mountain shadow/base
+  ctx.fillStyle = '#64748b';
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.moveTo(-height * 0.6, 0);
+  ctx.lineTo(0, -height);
+  ctx.lineTo(height * 0.6, 0);
   ctx.closePath();
+  ctx.fill();
+  
+  // Mountain main body
+  const mtGrad = ctx.createLinearGradient(0, -height, 0, 0);
+  mtGrad.addColorStop(0, '#94a3b8');
+  mtGrad.addColorStop(0.5, '#64748b');
+  mtGrad.addColorStop(1, '#475569');
+  ctx.fillStyle = mtGrad;
+  ctx.beginPath();
+  ctx.moveTo(-height * 0.5, 0);
+  ctx.lineTo(0, -height);
+  ctx.lineTo(height * 0.5, 0);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Snow cap
+  ctx.fillStyle = '#f1f5f9';
+  ctx.beginPath();
+  ctx.moveTo(-height * 0.12, -height * 0.78);
+  ctx.lineTo(0, -height);
+  ctx.lineTo(height * 0.12, -height * 0.78);
+  ctx.lineTo(0, -height * 0.65);
+  ctx.closePath();
+  ctx.fill();
+  
+  ctx.restore();
+}
+
+function drawPond(x, y, size) {
+  ctx.save();
+  ctx.translate(x, y);
+  
+  // Pond water gradient
+  const pondGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
+  pondGrad.addColorStop(0, '#60a5fa');
+  pondGrad.addColorStop(0.6, '#3b82f6');
+  pondGrad.addColorStop(1, '#1d4ed8');
+  
+  ctx.fillStyle = pondGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, size, size * 0.4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Water shimmer highlights
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(-size * 0.3, -size * 0.1, size * 0.15, size * 0.05, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.beginPath();
+  ctx.ellipse(size * 0.2, size * 0.05, size * 0.1, size * 0.04, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Pond edge
+  ctx.strokeStyle = '#1e40af';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, size, size * 0.4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  ctx.restore();
+}
+
+function drawFlowers(x, y, count) {
+  ctx.save();
+  ctx.translate(x, y);
+  
+  const flowerColors = ['#f43f5e', '#a855f7', '#fbbf24', '#22c55e', '#ec4899'];
+  
+  for (let i = 0; i < count; i++) {
+    const fx = (Math.random() - 0.5) * 60;
+    const fy = (Math.random() - 0.5) * 20;
+    const color = flowerColors[i % flowerColors.length];
+    const size = 3 + Math.random() * 3;
+    
+    // Stem
+    ctx.strokeStyle = '#16a34a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx, fy + size * 1.5);
+    ctx.stroke();
+    
+    // Flower petals
+    ctx.fillStyle = color;
+    for (let p = 0; p < 5; p++) {
+      const angle = (p / 5) * Math.PI * 2;
+      const px = fx + Math.cos(angle) * size * 0.6;
+      const py = fy + Math.sin(angle) * size * 0.6;
+      ctx.beginPath();
+      ctx.arc(px, py, size * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Flower center
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(fx, fy, size * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  ctx.restore();
+}
+
+function drawFlowerLine(x, y, count) {
+  ctx.save();
+  ctx.translate(x, y);
+  
+  const flowerColors = ['#f43f5e', '#a855f7', '#fbbf24', '#22c55e', '#ec4899', '#3b82f6', '#f97316'];
+  const spacing = 12;
+  
+  for (let i = 0; i < count; i++) {
+    const fx = i * spacing - (count * spacing) / 2;
+    const fy = 0;
+    const color = flowerColors[i % flowerColors.length];
+    const size = 4;
+    
+    // Stem
+    ctx.strokeStyle = '#16a34a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx, fy + size * 2);
+    ctx.stroke();
+    
+    // Flower petals
+    ctx.fillStyle = color;
+    for (let p = 0; p < 5; p++) {
+      const angle = (p / 5) * Math.PI * 2;
+      const px = fx + Math.cos(angle) * size * 0.7;
+      const py = fy + Math.sin(angle) * size * 0.7;
+      ctx.beginPath();
+      ctx.arc(px, py, size * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Flower center
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(fx, fy, size * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  ctx.restore();
+}
+
+// ── Canvas init ──────────────────────────────────────────
+function initCanvas() {
+  canvas = document.getElementById('roadCanvas');
+  ctx    = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', () => { resizeCanvas(); spawnAll(); });
+  spawnAll();
+  requestAnimationFrame(drawFrame);
+}
+
+function resizeCanvas() {
+  canvas.width  = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
 }
 </script>
 </body>

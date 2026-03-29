@@ -41,16 +41,20 @@ CREATE TABLE IF NOT EXISTS device_config (
 
   -- Manual mode: which light to force on
   manual_light    text    NOT NULL DEFAULT 'red'
-                          CHECK (manual_light IN ('red', 'yellow', 'green', 'off')),
+                          CHECK (manual_light IN ('red', 'yellow', 'green', 'prep', 'off')),
 
   -- Auto mode: duration of each phase in seconds
   red_duration    int     NOT NULL DEFAULT 30 CHECK (red_duration    BETWEEN 1 AND 300),
+  prep_duration   int     NOT NULL DEFAULT 3  CHECK (prep_duration   BETWEEN 1 AND 10),
   yellow_duration int     NOT NULL DEFAULT 5  CHECK (yellow_duration BETWEEN 1 AND 60),
   green_duration  int     NOT NULL DEFAULT 25 CHECK (green_duration  BETWEEN 1 AND 300),
 
   -- Current light (written back by the ESP32, read by dashboard)
   current_light   text    NOT NULL DEFAULT 'red'
-                          CHECK (current_light IN ('red', 'yellow', 'green', 'off')),
+                          CHECK (current_light IN ('red', 'yellow', 'green', 'prep', 'off')),
+
+  -- Remaining time in seconds (written by ESP32, read by dashboard for countdown)
+  remaining_time  int     NOT NULL DEFAULT 0,
 
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
@@ -73,7 +77,7 @@ CREATE OR REPLACE TRIGGER trg_config_updated_at
 CREATE TABLE IF NOT EXISTS traffic_log (
   id          bigserial     PRIMARY KEY,
   device_id   text          NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
-  light       text          NOT NULL CHECK (light IN ('red', 'yellow', 'green', 'off')),
+  light       text          NOT NULL CHECK (light IN ('red', 'yellow', 'green', 'prep', 'off')),
   mode        text          NOT NULL CHECK (mode IN ('auto', 'manual')),
   source      text          NOT NULL DEFAULT 'device'
                             CHECK (source IN ('device', 'dashboard')),
@@ -110,7 +114,10 @@ CREATE POLICY "anon_all_traffic_log"   ON traffic_log   FOR ALL TO anon USING (t
 -- ALTER PUBLICATION supabase_realtime ADD TABLE devices;
 
 -- ── Useful views ─────────────────────────────────────────
-CREATE OR REPLACE VIEW v_device_status AS
+-- Drop and recreate view to allow column order changes
+DROP VIEW IF EXISTS v_device_status;
+
+CREATE VIEW v_device_status AS
 SELECT
   d.device_id,
   d.name,
@@ -120,6 +127,7 @@ SELECT
   c.mode,
   c.enabled,
   c.current_light,
+  c.remaining_time,
   c.manual_light,
   c.red_duration,
   c.yellow_duration,
