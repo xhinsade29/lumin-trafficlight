@@ -31,9 +31,9 @@ const char* DEVICE_ID     = "ESP32_TL_001";
 // ──────────────────────────────────────────────────────────
 // DURATIONS (seconds) — fixed, not fetched from DB
 // ──────────────────────────────────────────────────────────
-#define DUR_RED     30
+#define DUR_RED     15
 #define DUR_YELLOW   5
-#define DUR_GREEN   25
+#define DUR_GREEN   10
 
 // ──────────────────────────────────────────────────────────
 // INTERVALS (milliseconds)
