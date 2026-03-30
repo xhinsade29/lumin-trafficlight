@@ -1153,13 +1153,24 @@ function drawFrame() {
     
     if (shouldStop) {
       const inCrossing = rightward
-        ? (car.x + car.w > crossLeft && car.x < crossRight)   // any part inside crossing
+        ? (car.x + car.w > crossLeft && car.x < crossRight)
         : (car.x < crossRight && car.x + car.w > crossLeft);
-      // For yellow light, vehicles already in crossing should continue through to clear it
-      // Only stop vehicles in crossing for red/prep lights
-      const stopInCrossing = inCrossing && (roadLightState === 'red' || roadLightState === 'prep');
-      if (rightward  && ((car.x + car.w) >= (stopLeft - safetyBuffer) || stopInCrossing))  car.stopped = true;
-      if (!rightward && (car.x <= (stopRight + safetyBuffer) || stopInCrossing))            car.stopped = true;
+      
+      // CRITICAL: During yellow, vehicles already in crossing must continue through
+      // Never stop vehicles in crossing during yellow - force them to clear it
+      if (roadLightState === 'yellow' && inCrossing) {
+        car.stopped = false; // Force continue through
+      } else {
+        // For red/prep: stop at stop line (ensuring front of vehicle stays before crossing)
+        // For yellow: only stop if completely before crossing
+        const stopBeforeCrossing = rightward
+          ? (car.x + car.w) >= stopLeft  // Stop when front reaches stop line
+          : car.x <= stopRight;          // Stop when front reaches stop line
+        
+        if (stopBeforeCrossing || (inCrossing && roadLightState !== 'yellow')) {
+          car.stopped = true;
+        }
+      }
     } else {
       car.stopped = false;
     }
