@@ -202,7 +202,7 @@ void pushStateToDB() {
   
   static unsigned long lastWrite = 0;
   unsigned long now = millis();
-  if (now - lastWrite < 1000) return; // Reduced to 1s for dashboard sync
+  if (now - lastWrite < 100) return; // Reduced to 1s for dashboard sync
   lastWrite = now;
   
   String url  = String(SUPABASE_URL) + "/rest/v1/device_config?device_id=eq." + DEVICE_ID;

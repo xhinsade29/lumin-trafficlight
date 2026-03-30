@@ -487,7 +487,7 @@ function initSupabase() {
     if (ok) { subscribeRealtime(); fetchActivity(); }
   });
 
-  pollTimer = setInterval(pollDB, 1000);
+  pollTimer = setInterval(pollDB, 100);
 }
 
 async function fetchAll() {
@@ -593,7 +593,7 @@ async function writeToDB(patch) {
     const { error } = await sb.from('device_config').update(patch).eq('device_id', DEVICE_ID);
     if (error) throw error; return true;
   } catch(e) { showBanner('Write failed: ' + e.message); return false; }
-  finally { setTimeout(() => { isWriting = false; }, 500); }
+  finally { isWriting = false; }
 }
 
 async function onMasterChange() {
@@ -608,7 +608,7 @@ async function onMasterChange() {
   if (ok) {
     addLog(enabled ? 'green' : 'off', 'System ' + (enabled ? 'ENABLED' : 'DISABLED'));
     sendSerial(enabled ? 'ENABLE' : 'DISABLE');
-    if (enabled) setTimeout(fetchAll, 600);
+    if (enabled) fetchAll();
   }
 }
 
@@ -1152,8 +1152,14 @@ function drawFrame() {
     }
     
     if (shouldStop) {
-      if (rightward  && (car.x + car.w) >= (stopLeft - safetyBuffer))  car.stopped = true;
-      if (!rightward && car.x <= (stopRight + safetyBuffer))            car.stopped = true;
+      const inCrossing = rightward
+        ? (car.x + car.w > crossLeft && car.x < crossRight)   // any part inside crossing
+        : (car.x < crossRight && car.x + car.w > crossLeft);
+      // For yellow light, vehicles already in crossing should continue through to clear it
+      // Only stop vehicles in crossing for red/prep lights
+      const stopInCrossing = inCrossing && (roadLightState === 'red' || roadLightState === 'prep');
+      if (rightward  && ((car.x + car.w) >= (stopLeft - safetyBuffer) || stopInCrossing))  car.stopped = true;
+      if (!rightward && (car.x <= (stopRight + safetyBuffer) || stopInCrossing))            car.stopped = true;
     } else {
       car.stopped = false;
     }
